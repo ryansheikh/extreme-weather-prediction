@@ -1,0 +1,182 @@
+{
+  "Mumbai": {
+    "country": "India",
+    "continent": "Asia",
+    "latitude": 19.076,
+    "longitude": 72.8777,
+    "coastal": true,
+    "climate_zone": "Tropical monsoon",
+    "note": "Severe monsoon flooding, cyclone exposure"
+  },
+  "Miami": {
+    "country": "USA",
+    "continent": "North America",
+    "latitude": 25.7617,
+    "longitude": -80.1918,
+    "coastal": true,
+    "climate_zone": "Tropical monsoon",
+    "note": "Hurricane corridor, sea-level rise hotspot"
+  },
+  "Lagos": {
+    "country": "Nigeria",
+    "continent": "Africa",
+    "latitude": 6.5244,
+    "longitude": 3.3792,
+    "coastal": true,
+    "climate_zone": "Tropical savanna",
+    "note": "Rapid urbanisation, coastal flooding"
+  },
+  "Jakarta": {
+    "country": "Indonesia",
+    "continent": "Asia",
+    "latitude": -6.2088,
+    "longitude": 106.8456,
+    "coastal": true,
+    "climate_zone": "Tropical rainforest",
+    "note": "Land subsidence, extreme rainfall"
+  },
+  "Sydney": {
+    "country": "Australia",
+    "continent": "Oceania",
+    "latitude": -33.8688,
+    "longitude": 151.2093,
+    "coastal": true,
+    "climate_zone": "Humid subtropical",
+    "note": "Bushfire risk, drought cycles"
+  },
+  "Rotterdam": {
+    "country": "Netherlands",
+    "continent": "Europe",
+    "latitude": 51.9244,
+    "longitude": 4.4777,
+    "coastal": true,
+    "climate_zone": "Oceanic",
+    "note": "Below sea level, advanced flood infrastructure"
+  },
+  "Cape_Town": {
+    "country": "South Africa",
+    "continent": "Africa",
+    "latitude": -33.9249,
+    "longitude": 18.4241,
+    "coastal": true,
+    "climate_zone": "Mediterranean",
+    "note": "Water scarcity, Day Zero crisis (2018)"
+  },
+  "Dhaka": {
+    "country": "Bangladesh",
+    "continent": "Asia",
+    "latitude": 23.8103,
+    "longitude": 90.4125,
+    "coastal": true,
+    "climate_zone": "Tropical monsoon",
+    "note": "Cyclone-prone, extreme flood risk"
+  },
+  "Tokyo": {
+    "country": "Japan",
+    "continent": "Asia",
+    "latitude": 35.6762,
+    "longitude": 139.6503,
+    "coastal": true,
+    "climate_zone": "Humid subtropical",
+    "note": "Typhoon corridor, urban heat island"
+  },
+  "Karachi": {
+    "country": "Pakistan",
+    "continent": "Asia",
+    "latitude": 24.8607,
+    "longitude": 67.0011,
+    "coastal": true,
+    "climate_zone": "Arid / hot desert",
+    "note": "Extreme heatwaves, monsoon flooding"
+  },
+  "Delhi": {
+    "country": "India",
+    "continent": "Asia",
+    "latitude": 28.7041,
+    "longitude": 77.1025,
+    "coastal": false,
+    "climate_zone": "Semi-arid / hot",
+    "note": "Severe air pollution, extreme heat"
+  },
+  "Riyadh": {
+    "country": "Saudi Arabia",
+    "continent": "Asia",
+    "latitude": 24.7136,
+    "longitude": 46.6753,
+    "coastal": false,
+    "climate_zone": "Hot desert",
+    "note": "Extreme heat >50\u00b0C, sandstorms"
+  },
+  "Nairobi": {
+    "country": "Kenya",
+    "continent": "Africa",
+    "latitude": -1.2921,
+    "longitude": 36.8219,
+    "coastal": false,
+    "climate_zone": "Subtropical highland",
+    "note": "Drought\u2013flood oscillation, altitude climate"
+  },
+  "Chicago": {
+    "country": "USA",
+    "continent": "North America",
+    "latitude": 41.8781,
+    "longitude": -87.6298,
+    "coastal": false,
+    "climate_zone": "Humid continental",
+    "note": "Polar vortex, severe winter storms"
+  },
+  "Moscow": {
+    "country": "Russia",
+    "continent": "Europe",
+    "latitude": 55.7558,
+    "longitude": 37.6173,
+    "coastal": false,
+    "climate_zone": "Humid continental",
+    "note": "Extreme cold, heatwave events (2010)"
+  },
+  "Ulaanbaatar": {
+    "country": "Mongolia",
+    "continent": "Asia",
+    "latitude": 47.8864,
+    "longitude": 106.9057,
+    "coastal": false,
+    "climate_zone": "Subarctic / cold steppe",
+    "note": "Coldest capital, dzud (extreme winter)"
+  },
+  "Phoenix": {
+    "country": "USA",
+    "continent": "North America",
+    "latitude": 33.4484,
+    "longitude": -112.074,
+    "coastal": false,
+    "climate_zone": "Hot desert",
+    "note": "Record-breaking heatwaves, urban heat island"
+  },
+  "Sao_Paulo": {
+    "country": "Brazil",
+    "continent": "South America",
+    "latitude": -23.5505,
+    "longitude": -46.6333,
+    "coastal": false,
+    "climate_zone": "Humid subtropical",
+    "note": "Urban flooding, water crisis (2014-15)"
+  },
+  "Cairo": {
+    "country": "Egypt",
+    "continent": "Africa",
+    "latitude": 30.0444,
+    "longitude": 31.2357,
+    "coastal": false,
+    "climate_zone": "Hot desert",
+    "note": "Extreme heat, dust storms"
+  },
+  "Madrid": {
+    "country": "Spain",
+    "continent": "Europe",
+    "latitude": 40.4168,
+    "longitude": -3.7038,
+    "coastal": false,
+    "climate_zone": "Hot-summer Mediterranean",
+    "note": "European heatwaves, drought risk"
+  }
+}

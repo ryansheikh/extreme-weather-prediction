@@ -1,0 +1,16 @@
+feature,mean_abs_shap
+precipitation,2.2903
+temperature_2m,1.9755
+windspeed_10m,1.7923
+cloudcover,0.6703
+precipitation_roll_24h_std,0.2254
+relative_humidity_2m,0.1973
+windspeed_10m_roll_24h_mean,0.1381
+longitude,0.1056
+temperature_2m_lag_24h,0.1002
+city_id,0.056
+windspeed_10m_roll_24h_std,0.0487
+windspeed_10m_roll_7d_std,0.0405
+precipitation_roll_24h_mean,0.0344
+temperature_2m_roll_24h_std,0.0258
+climate_zone_id,0.0249

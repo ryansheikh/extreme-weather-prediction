@@ -1,0 +1,57 @@
+{
+  "pipeline": "A",
+  "task": "temperature_forecasting",
+  "best_hyperparameters": {
+    "n_estimators": 1200,
+    "max_depth": 8,
+    "learning_rate": 0.03,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 5
+  },
+  "cross_validation": {
+    "cv_rmse_mean": 0.9362795274910379,
+    "cv_rmse_std": 0.44386096526023905,
+    "cv_mae_mean": 0.5476726348719974,
+    "cv_r2_mean": 0.988736323501586
+  },
+  "test_metrics": {
+    "name": "XGBoost (test)",
+    "rmse": 0.6279563799297901,
+    "mae": 0.4206174507466525,
+    "r2": 0.9963113411136931,
+    "mape_pct": 3.2892588346490266
+  },
+  "persistence_baseline": {
+    "rmse": 1.0872393783725036,
+    "mae": 0.7883888160519865,
+    "r2": 0.9889424251467219
+  },
+  "improvement_over_baseline_pct": {
+    "rmse": 42.24,
+    "mae": 46.65
+  },
+  "statistical_significance": {
+    "wilcoxon_statistic": 12373742363.5,
+    "p_value": 0.0,
+    "model_better": true,
+    "significant_at_0.01": true
+  },
+  "uncertainty_metrics": {
+    "coverage_80pct": 0.7844068859374109,
+    "target_coverage": 0.8,
+    "coverage_gap": -0.01559311406258912,
+    "avg_interval_width_C": 1.289432168006897,
+    "pinball_loss_q10": 0.10608193013046133,
+    "pinball_loss_q90": 0.10079972692020056
+  },
+  "top_5_features": [
+    "temperature_2m",
+    "temperature_2m_lag_24h",
+    "shortwave_radiation",
+    "temperature_2m_roll_24h_mean",
+    "hour"
+  ],
+  "per_city_performance_file": "pipeline_A_per_city_performance.csv",
+  "seasonal_performance_file": "pipeline_A_seasonal_performance.csv"
+}

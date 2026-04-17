@@ -1,0 +1,44 @@
+{
+  "pipeline": "C",
+  "task": "heatwave_detection",
+  "target": "target_heatwave",
+  "class_balance": {
+    "neg": 1538948,
+    "pos": 37372,
+    "spw": 41.18
+  },
+  "best_params": {
+    "n_estimators": 1500,
+    "max_depth": 8,
+    "learning_rate": 0.02,
+    "subsample": 0.75,
+    "colsample_bytree": 0.75,
+    "min_child_weight": 7,
+    "gamma": 0.3
+  },
+  "cv": {
+    "cv_f1_mean": 0.8795388652756302,
+    "cv_f1_std": 0.21536838962067667,
+    "cv_auc_mean": 0.9998113687668703
+  },
+  "test_metrics": {
+    "name": "XGBoost (test)",
+    "accuracy": 0.9988856589147287,
+    "precision": 0.9772260976610587,
+    "recall": 0.9825683341928829,
+    "f1_score": 0.979889934680862,
+    "roc_auc": 0.9999714114134396,
+    "brier_score": 0.000728599479213426
+  },
+  "baseline": {
+    "accuracy": 0.9723694710442317,
+    "f1": 0.0
+  },
+  "top_5_features": [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "temperature_2m_lag_24h",
+    "temperature_2m_roll_24h_mean",
+    "temperature_2m_roll_24h_std"
+  ]
+}

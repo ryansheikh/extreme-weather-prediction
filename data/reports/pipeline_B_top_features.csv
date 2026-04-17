@@ -1,0 +1,16 @@
+feature,mean_abs_shap
+precipitation,12.4654
+precipitation_roll_24h_std,0.6714
+cloudcover,0.1312
+precipitation_roll_24h_mean,0.0778
+relative_humidity_2m,0.0317
+relative_humidity_2m_lag_24h,0.0151
+shortwave_radiation,0.0098
+temperature_2m_roll_24h_mean,0.0042
+temperature_2m_lag_24h,0.0029
+temperature_2m_lag_48h,0.0017
+windspeed_10m,0.0014
+precipitation_roll_7d_std,0.0013
+temperature_2m_lag_72h,0.0008
+hour,0.0007
+temperature_2m,0.0006

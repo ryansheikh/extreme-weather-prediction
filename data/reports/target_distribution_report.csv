@@ -1,0 +1,21 @@
+city,country,continent,coastal,heatwave_threshold_C,total_hours,rain_hours,rain_pct,heatwave_hours,heatwave_pct,storm_hours,storm_pct,disaster_normal_pct,disaster_heatwave_pct,disaster_rain_pct,disaster_storm_pct
+Cairo,Egypt,Africa,False,35.0,131472,65,0.05,10457,7.95,3,0.0,91.99,7.95,0.05,0.0
+Cape_Town,South Africa,Africa,True,35.0,131472,2161,1.64,27,0.02,166,0.13,98.26,0.02,1.59,0.13
+Chicago,USA,North America,False,35.0,131472,4380,3.33,33,0.03,567,0.43,96.28,0.03,3.26,0.43
+Delhi,India,Asia,False,40.0,131472,2639,2.01,2367,1.8,0,0.0,96.19,1.8,2.01,0.0
+Dhaka,Bangladesh,Asia,True,40.0,131472,7056,5.37,1,0.0,4,0.0,94.63,0.0,5.37,0.0
+Jakarta,Indonesia,Asia,True,35.0,131472,8467,6.44,93,0.07,0,0.0,93.49,0.07,6.44,0.0
+Karachi,Pakistan,Asia,True,40.0,131472,613,0.47,48,0.04,107,0.08,99.42,0.04,0.46,0.08
+Lagos,Nigeria,Africa,True,35.0,131472,4988,3.79,1,0.0,0,0.0,96.21,0.0,3.79,0.0
+Madrid,Spain,Europe,False,35.0,131472,1671,1.27,1816,1.38,11,0.01,97.34,1.38,1.27,0.01
+Miami,USA,North America,True,35.0,131472,4537,3.45,2,0.0,140,0.11,96.51,0.0,3.38,0.11
+Moscow,Russia,Europe,False,35.0,131472,1916,1.46,42,0.03,41,0.03,98.48,0.03,1.46,0.03
+Mumbai,India,Asia,True,40.0,131472,8273,6.29,0,0.0,39,0.03,93.7,0.0,6.27,0.03
+Nairobi,Kenya,Africa,False,35.0,131472,2204,1.68,0,0.0,0,0.0,98.32,0.0,1.68,0.0
+Phoenix,USA,North America,False,35.0,131472,1090,0.83,20555,15.63,6,0.0,83.55,15.62,0.83,0.0
+Riyadh,Saudi Arabia,Asia,False,35.0,131472,280,0.21,29898,22.74,15,0.01,77.04,22.74,0.21,0.01
+Rotterdam,Netherlands,Europe,True,35.0,131472,3029,2.3,12,0.01,546,0.42,97.34,0.01,2.24,0.42
+Sao_Paulo,Brazil,South America,False,35.0,131472,4937,3.76,36,0.03,2,0.0,96.22,0.03,3.76,0.0
+Sydney,Australia,Oceania,True,35.0,131472,3239,2.46,170,0.13,34,0.03,97.4,0.13,2.45,0.03
+Tokyo,Japan,Asia,True,35.0,131472,6209,4.72,156,0.12,1097,0.83,94.54,0.12,4.51,0.83
+Ulaanbaatar,Mongolia,Asia,False,35.0,131472,1097,0.83,11,0.01,6,0.0,99.15,0.01,0.83,0.0

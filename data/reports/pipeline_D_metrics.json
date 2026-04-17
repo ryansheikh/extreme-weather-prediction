@@ -1,0 +1,58 @@
+{
+  "pipeline": "D",
+  "task": "disaster_classification",
+  "target": "target_disaster",
+  "classes": {
+    "0": "Normal",
+    "1": "Heatwave",
+    "2": "Heavy Rain",
+    "3": "Storm"
+  },
+  "class_weights": {
+    "0": 0.26,
+    "2": 9.89,
+    "1": 10.55,
+    "3": 350.6
+  },
+  "best_params": {
+    "n_estimators": 400,
+    "max_depth": 5,
+    "learning_rate": 0.05,
+    "subsample": 0.9,
+    "colsample_bytree": 0.9,
+    "min_child_weight": 3,
+    "gamma": 0.0
+  },
+  "cv": {
+    "cv_wf1_mean": 0.999495138242283,
+    "cv_wf1_std": 0.0009279398851132467
+  },
+  "test_metrics": {
+    "accuracy": 1.0,
+    "weighted_f1": 1.0,
+    "macro_f1": 1.0,
+    "per_class_auc": {
+      "Normal": 1.0,
+      "Heatwave": 1.0,
+      "Heavy Rain": 1.0,
+      "Storm": 1.0
+    }
+  },
+  "baseline": {
+    "accuracy": 0.9423335613315094,
+    "weighted_f1": 0.9143563788322625
+  },
+  "entropy_uncertainty": {
+    "mean_entropy": 0.0001336136629106477,
+    "mean_confidence": 0.9999331931693516,
+    "confidence_when_correct": 0.9999331931693516,
+    "confidence_when_wrong": "N/A"
+  },
+  "top_5_features": [
+    "precipitation",
+    "temperature_2m",
+    "windspeed_10m",
+    "cloudcover",
+    "precipitation_roll_24h_std"
+  ]
+}

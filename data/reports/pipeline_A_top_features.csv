@@ -1,0 +1,16 @@
+feature,mean_abs_shap
+temperature_2m,6.263
+temperature_2m_lag_24h,1.2173
+shortwave_radiation,0.5075
+temperature_2m_roll_24h_mean,0.4724
+hour,0.2209
+temperature_2m_lag_48h,0.1049
+temperature_2m_roll_7d_mean,0.0813
+longitude,0.0626
+relative_humidity_2m,0.0612
+windspeed_10m,0.0514
+year,0.044
+latitude,0.0407
+precipitation,0.0378
+temperature_2m_roll_24h_std,0.0361
+cloudcover,0.036

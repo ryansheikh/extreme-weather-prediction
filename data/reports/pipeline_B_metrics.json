@@ -1,0 +1,48 @@
+{
+  "pipeline": "B",
+  "task": "rainfall_prediction",
+  "target": "target_rain",
+  "class_balance": {
+    "negative": 1536162,
+    "positive": 40158,
+    "scale_pos_weight": 38.25
+  },
+  "best_hyperparameters": {
+    "n_estimators": 400,
+    "max_depth": 5,
+    "learning_rate": 0.05,
+    "subsample": 0.9,
+    "colsample_bytree": 0.9,
+    "min_child_weight": 3,
+    "gamma": 0.0
+  },
+  "cross_validation": {
+    "cv_f1_mean": 1.0,
+    "cv_f1_std": 0.0,
+    "cv_auc_mean": 1.0
+  },
+  "test_metrics": {
+    "name": "XGBoost (test)",
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "roc_auc": 1.0,
+    "brier_score": 7.50488563825112e-12,
+    "log_loss": 2.187345248924359e-06
+  },
+  "baseline": 0.9712009803921569,
+  "improvement_f1_over_baseline": 1.0,
+  "statistical_significance": {
+    "mcnemar_chi2": 10103.00009896091,
+    "p_value": 0.0,
+    "significant_at_0.01": true
+  },
+  "top_5_features": [
+    "precipitation",
+    "precipitation_roll_24h_std",
+    "cloudcover",
+    "precipitation_roll_24h_mean",
+    "relative_humidity_2m"
+  ]
+}
