@@ -1,1025 +1,653 @@
+#!/usr/bin/env python3
+"""
+==============================================================================
+FILE 7: app.py — Streamlit Dashboard
+==============================================================================
+Project : AI-Driven Extreme Weather Prediction — A Global Perspective
+Author  : [Your Name]
+
+Dashboard Features:
+    TAB 1 — Live Predictions (temperature, rain, heatwave, disaster + alerts)
+    TAB 2 — SHAP Explainability (per-pipeline analysis)
+    TAB 3 — Historical Trends (temperature, heatwave, rainfall charts)
+    TAB 4 — Model Performance (metrics, confusion matrices, ROC curves)
+    TAB 5 — Data Explorer (interactive data table, stats, correlation)
+
+Run locally:  streamlit run app.py
+Deploy:       Push to GitHub → connect to Streamlit Cloud
+==============================================================================
+"""
+
 import streamlit as st
 import pandas as pd
+import numpy as np
+import json
+import joblib
+from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import json
-import warnings
-warnings.filterwarnings('ignore')
 
-# ── PAGE CONFIG ─────────────────────────────────────────────
+# ============================================================
+# PAGE CONFIG
+# ============================================================
 st.set_page_config(
-    page_title="Pharmevo Business Intelligence",
-    page_icon="💊",
+    page_title="AI Extreme Weather Prediction",
+    page_icon="🌦️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# ── CUSTOM CSS ───────────────────────────────────────────────
+# ============================================================
+# CUSTOM CSS (dark weather theme)
+# ============================================================
 st.markdown("""
 <style>
-    .main { background-color: #0f1117; }
-    .block-container { padding-top: 1rem; }
-
-    .kpi-card {
-        background: linear-gradient(135deg, #1a1d2e, #2d2d44);
-        border: 1px solid #3d3d5c;
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        margin: 5px;
-    }
-    .kpi-value {
-        font-size: 28px;
-        font-weight: 800;
-        color: #00d4ff;
-        margin: 8px 0;
-    }
-    .kpi-label {
-        font-size: 13px;
-        color: #a0a0b0;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .kpi-delta {
-        font-size: 14px;
-        color: #00ff88;
-        font-weight: 600;
-    }
-    .insight-box {
-        background: linear-gradient(135deg, #1a2d1a, #1a1d2e);
-        border-left: 4px solid #00ff88;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 8px 0;
-        color: #e0e0e0;
-        font-size: 14px;
-    }
-    .warning-box {
-        background: linear-gradient(135deg, #2d1a1a, #1a1d2e);
-        border-left: 4px solid #ff4444;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 8px 0;
-        color: #e0e0e0;
-        font-size: 14px;
-    }
-    .section-header {
-        font-size: 20px;
+    .main-header {
+        font-size: 2.2rem;
         font-weight: 700;
-        color: #00d4ff;
-        border-bottom: 2px solid #00d4ff;
-        padding-bottom: 8px;
-        margin: 20px 0 15px 0;
+        color: #1E88E5;
+        text-align: center;
+        padding: 0.5rem 0;
     }
-    div[data-testid="stMetricValue"] {
-        color: #00d4ff;
-        font-size: 24px;
+    .sub-header {
+        font-size: 1.0rem;
+        color: #90A4AE;
+        text-align: center;
+        margin-bottom: 1.5rem;
     }
+    .metric-card {
+        background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+        padding: 1.2rem;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        margin: 0.3rem 0;
+    }
+    .alert-green { background: linear-gradient(135deg, #1b5e20, #2e7d32); padding: 1rem; border-radius: 10px; color: white; text-align: center; font-size: 1.2rem; font-weight: bold; }
+    .alert-yellow { background: linear-gradient(135deg, #f57f17, #fbc02d); padding: 1rem; border-radius: 10px; color: black; text-align: center; font-size: 1.2rem; font-weight: bold; }
+    .alert-orange { background: linear-gradient(135deg, #e65100, #ff6d00); padding: 1rem; border-radius: 10px; color: white; text-align: center; font-size: 1.2rem; font-weight: bold; }
+    .alert-red { background: linear-gradient(135deg, #b71c1c, #d32f2f); padding: 1rem; border-radius: 10px; color: white; text-align: center; font-size: 1.2rem; font-weight: bold; }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] { padding: 10px 20px; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── LOAD DATA ────────────────────────────────────────────────
+# ============================================================
+# PATH DETECTION
+# ============================================================
 @st.cache_data
-def load_data():
-    df_sales    = pd.read_csv('data/processed/sales_clean.csv')
-    df_act      = pd.read_csv('data/processed/activities_clean.csv')
-    df_merged   = pd.read_csv('data/processed/merged_analysis.csv')
-    df_roi      = pd.read_csv('data/processed/roi_analysis.csv')
-    df_returns  = pd.read_csv('data/processed/sales_returns.csv')
-
-    with open('data/processed/kpis.json') as f:
-        kpis = json.load(f)
-
-    df_sales['Date']  = pd.to_datetime(df_sales['Date'])
-    df_act['Date']    = pd.to_datetime(df_act['Date'])
-
-    return df_sales, df_act, df_merged, df_roi, df_returns, kpis
-
-df_sales, df_act, df_merged, df_roi, df_returns, kpis = load_data()
-
-# ── SIDEBAR ──────────────────────────────────────────────────
-st.sidebar.image("https://img.icons8.com/color/96/pill.png", width=60)
-st.sidebar.title("💊 Pharmevo BI")
-st.sidebar.markdown("---")
-
-page = st.sidebar.radio("Navigate", [
-    "🏠 Executive Summary",
-    "📈 Sales Analysis",
-    "💰 Promotional Analysis",
-    "🔗 Combined ROI Analysis",
-    "🔮 Predictions & Forecast",
-    "🚨 Alerts & Opportunities"
-])
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔧 Filters")
-
-year_filter = st.sidebar.multiselect(
-    "Select Year(s)",
-    options=sorted(df_sales['Yr'].unique()),
-    default=sorted(df_sales['Yr'].unique())
-)
-
-team_filter = st.sidebar.multiselect(
-    "Select Team(s)",
-    options=sorted(df_sales['TeamName'].unique()),
-    default=[]
-)
-
-# Apply filters
-df_s = df_sales[df_sales['Yr'].isin(year_filter)]
-df_a = df_act[df_act['Yr'].isin(year_filter)]
-
-if team_filter:
-    df_s = df_s[df_s['TeamName'].isin(team_filter)]
-    df_a = df_a[df_a['RequestorTeams'].str.upper().isin(
-        [t.upper() for t in team_filter])]
-
-st.sidebar.markdown("---")
-st.sidebar.caption("Data: Pharmevo SQL Server\nUpdated: March 2026")
-
-# ════════════════════════════════════════════════════════════
-# PAGE 1: EXECUTIVE SUMMARY
-# ════════════════════════════════════════════════════════════
-if page == "🏠 Executive Summary":
-
-    st.markdown("""
-    <h1 style='color:#00d4ff; margin-bottom:0'>
-    💊 Pharmevo Business Intelligence Dashboard
-    </h1>
-    <p style='color:#a0a0b0; font-size:16px'>
-    Sales & Promotional Analytics | 2017–2026 | Powered by SQL Server
-    </p>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # ── KPI CARDS ROW 1 ─────────────────────────────────────
-    st.markdown("### 📊 Key Performance Indicators")
-    c1, c2, c3, c4, c5 = st.columns(5)
-
-    with c1:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Total Revenue</div>
-            <div class='kpi-value'>PKR 47.8B</div>
-            <div class='kpi-delta'>↑ +16.6% YoY</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c2:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Total Units Sold</div>
-            <div class='kpi-value'>153.1M</div>
-            <div class='kpi-delta'>2024–2026</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c3:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Promo Investment</div>
-            <div class='kpi-value'>PKR 7.67B</div>
-            <div class='kpi-delta'>↑ +38.2% in 2025</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c4:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Overall ROI</div>
-            <div class='kpi-value'>20.3x</div>
-            <div class='kpi-delta'>PKR 1 → PKR 20.3</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c5:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Doctors Targeted</div>
-            <div class='kpi-value'>10,040</div>
-            <div class='kpi-delta'>Unique Doctors</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── KPI CARDS ROW 2 ─────────────────────────────────────
-    c1, c2, c3, c4, c5 = st.columns(5)
-
-    with c1:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Top Product</div>
-            <div class='kpi-value' style='font-size:18px'>X-Plended</div>
-            <div class='kpi-delta'>PKR 4.3B Revenue</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c2:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Top Team</div>
-            <div class='kpi-value' style='font-size:18px'>Challengers</div>
-            <div class='kpi-delta'>PKR 6.5B Revenue</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c3:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Best ROI Product</div>
-            <div class='kpi-value' style='font-size:18px'>Ramipace</div>
-            <div class='kpi-delta'>99.7x ROI</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c4:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Discount Rate</div>
-            <div class='kpi-value'>1.5%</div>
-            <div class='kpi-delta'>PKR 749M discounts</div>
-        </div>""", unsafe_allow_html=True)
-
-    with c5:
-        st.markdown(f"""
-        <div class='kpi-card'>
-            <div class='kpi-label'>Promo Correlation</div>
-            <div class='kpi-value'>0.784</div>
-            <div class='kpi-delta'>Strong same-month link</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── REVENUE TREND ────────────────────────────────────────
-    st.markdown("<div class='section-header'>📈 Revenue Trend</div>",
-                unsafe_allow_html=True)
-
-    monthly = df_s.groupby('Date')['TotalRevenue'].sum().reset_index()
-    complete = monthly[monthly['Date'].dt.year < 2026]
-    partial  = monthly[monthly['Date'].dt.year >= 2026]
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=complete['Date'], y=complete['TotalRevenue']/1e6,
-        name='Revenue', line=dict(color='#00d4ff', width=2.5),
-        fill='tozeroy', fillcolor='rgba(0,212,255,0.1)',
-        mode='lines+markers', marker=dict(size=4)
-    ))
-    fig.add_trace(go.Scatter(
-        x=partial['Date'], y=partial['TotalRevenue']/1e6,
-        name='2026 (Partial)', line=dict(color='#ffa500',
-        width=2.5, dash='dash'),
-        mode='lines+markers', marker=dict(size=6)
-    ))
-    fig.update_layout(
-        plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-        font_color='white', height=350,
-        xaxis=dict(gridcolor='#2d2d44', title='Month'),
-        yaxis=dict(gridcolor='#2d2d44',
-                   title='Revenue (Million PKR)',
-                   tickformat='PKR,.0f'),
-        legend=dict(bgcolor='#1a1d2e'),
-        hovermode='x unified'
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ── BOTTOM ROW: Products + Teams ─────────────────────────
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("<div class='section-header'>🏆 Top 10 Products</div>",
-                    unsafe_allow_html=True)
-        top_p = (df_s.groupby('ProductName')['TotalRevenue']
-                 .sum().nlargest(10).reset_index())
-        fig2 = px.bar(top_p, x='TotalRevenue', y='ProductName',
-                      orientation='h',
-                      color='TotalRevenue',
-                      color_continuous_scale='Blues')
-        fig2.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=350,
-            yaxis=dict(autorange='reversed'),
-            coloraxis_showscale=False,
-            xaxis_title='Revenue (PKR)',
-            yaxis_title=''
-        )
-        st.plotly_chart(fig2, use_container_width=True)
-
-    with col2:
-        st.markdown("<div class='section-header'>👥 Top 10 Teams</div>",
-                    unsafe_allow_html=True)
-        top_t = (df_s.groupby('TeamName')['TotalRevenue']
-                 .sum().nlargest(10).reset_index())
-        fig3 = px.bar(top_t, x='TotalRevenue', y='TeamName',
-                      orientation='h',
-                      color='TotalRevenue',
-                      color_continuous_scale='Greens')
-        fig3.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=350,
-            yaxis=dict(autorange='reversed'),
-            coloraxis_showscale=False,
-            xaxis_title='Revenue (PKR)',
-            yaxis_title=''
-        )
-        st.plotly_chart(fig3, use_container_width=True)
-
-    # ── KEY INSIGHTS ─────────────────────────────────────────
-    st.markdown("<div class='section-header'>💡 Key Insights</div>",
-                unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        <div class='insight-box'>
-        🌟 <b>Revenue grew 16.6%</b> from 2024 to 2025
-        (PKR 20.2B → PKR 23.6B) — strongest growth in 3 years
-        </div>
-        <div class='insight-box'>
-        🌟 <b>COVID-19 Impact Proven:</b> 2020 saw a 33.7% drop
-        in promo spend followed by full recovery in 2021 (+68.6%)
-        </div>
-        <div class='insight-box'>
-        🌟 <b>Promo spend correlation = 0.784</b> in same month —
-        marketing campaigns show immediate sales impact
-        </div>""", unsafe_allow_html=True)
-
-    with col2:
-        st.markdown("""
-        <div class='insight-box'>
-        🌟 <b>Ramipace ROI = 99.7x</b> — only PKR 4.3M spent
-        generates PKR 430M in revenue. Massively underinvested!
-        </div>
-        <div class='warning-box'>
-        ⚠️ <b>Shevit Budget Alert:</b> PKR 29M spent but only
-        5.6x ROI — 17x less efficient than Ramipace
-        </div>
-        <div class='warning-box'>
-        ⚠️ <b>2026 data is partial</b> (Jan–Mar only).
-        Do not compare directly with full years.
-        </div>""", unsafe_allow_html=True)
-
-
-# ════════════════════════════════════════════════════════════
-# PAGE 2: SALES ANALYSIS
-# ════════════════════════════════════════════════════════════
-elif page == "📈 Sales Analysis":
-
-    st.markdown("<h2 style='color:#00d4ff'>📈 Sales Deep Analysis</h2>",
-                unsafe_allow_html=True)
-
-    # ── YEARLY COMPARISON ────────────────────────────────────
-    st.markdown("<div class='section-header'>Year-over-Year Comparison</div>",
-                unsafe_allow_html=True)
-
-    yearly = (df_s[df_s['Yr'] < 2026]
-              .groupby('Yr').agg(
-                  Revenue=('TotalRevenue','sum'),
-                  Units=('TotalUnits','sum'),
-                  Invoices=('InvoiceCount','sum')
-              ).reset_index())
-
-    c1, c2, c3 = st.columns(3)
-    figs = [
-        ('Revenue (PKR)', 'Revenue', '#00d4ff'),
-        ('Units Sold',    'Units',   '#00ff88'),
-        ('Invoices',      'Invoices','#ffa500')
+def detect_paths():
+    """Auto-detect data and model paths."""
+    possible_data = [
+        Path.cwd() / "data",
+        Path.home() / "data",
+        Path.home() / "Desktop" / "FYP 2026" / "data",
+        Path("data"),
     ]
-    for col, (title, field, color) in zip([c1,c2,c3], figs):
-        with col:
-            fig = px.bar(yearly, x='Yr', y=field,
-                         title=title,
-                         color_discrete_sequence=[color])
-            fig.update_layout(
-                plot_bgcolor='#1a1d2e',
-                paper_bgcolor='#1a1d2e',
-                font_color='white', height=280,
-                xaxis=dict(gridcolor='#2d2d44',
-                           tickmode='array',
-                           tickvals=yearly['Yr']),
-                yaxis=dict(gridcolor='#2d2d44')
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-    # ── PRODUCT ANALYSIS ─────────────────────────────────────
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("<div class='section-header'>Product Revenue 2024 vs 2025</div>",
-                    unsafe_allow_html=True)
-        rev_yr = (df_s[df_s['Yr'].isin([2024,2025])]
-                  .groupby(['ProductName','Yr'])['TotalRevenue']
-                  .sum().reset_index())
-        top15 = (rev_yr.groupby('ProductName')['TotalRevenue']
-                 .sum().nlargest(15).index)
-        rev_yr = rev_yr[rev_yr['ProductName'].isin(top15)]
-
-        fig = px.bar(rev_yr, x='TotalRevenue', y='ProductName',
-                     color='Yr', barmode='group',
-                     orientation='h',
-                     color_discrete_map={2024:'#00d4ff',2025:'#00ff88'})
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=500,
-            yaxis=dict(autorange='reversed'),
-            xaxis_title='Revenue (PKR)', yaxis_title=''
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        st.markdown("<div class='section-header'>Fastest Growing Products 2024→2025</div>",
-                    unsafe_allow_html=True)
-
-        rev24 = (df_s[df_s['Yr']==2024]
-                 .groupby('ProductName')['TotalRevenue'].sum())
-        rev25 = (df_s[df_s['Yr']==2025]
-                 .groupby('ProductName')['TotalRevenue'].sum())
-        growth = pd.DataFrame({'2024':rev24,'2025':rev25}).dropna()
-        growth = growth[growth['2024'] > 5000000]
-        growth['Growth%'] = ((growth['2025']-growth['2024'])
-                              /growth['2024']*100)
-        growth = growth.sort_values('Growth%',
-                                    ascending=False).head(15).reset_index()
-
-        fig = px.bar(growth, x='Growth%', y='ProductName',
-                     orientation='h',
-                     color='Growth%',
-                     color_continuous_scale='Greens',
-                     title='Growth % 2024→2025')
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=500,
-            yaxis=dict(autorange='reversed'),
-            coloraxis_showscale=False,
-            xaxis_title='Growth %', yaxis_title=''
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ── SEASONALITY ──────────────────────────────────────────
-    st.markdown("<div class='section-header'>📅 Sales Seasonality Heatmap</div>",
-                unsafe_allow_html=True)
-
-    months_map = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',
-                  6:'Jun',7:'Jul',8:'Aug',9:'Sep',
-                  10:'Oct',11:'Nov',12:'Dec'}
-
-    heat = (df_s[df_s['Yr'] < 2026]
-            .groupby(['Yr','Mo'])['TotalRevenue']
-            .sum().reset_index())
-    heat['Month'] = heat['Mo'].map(months_map)
-    heat_pivot = heat.pivot(index='Yr', columns='Month',
-                            values='TotalRevenue')
-    month_order = list(months_map.values())
-    heat_pivot = heat_pivot.reindex(columns=month_order)
-
-    fig = px.imshow(heat_pivot/1e6,
-                    color_continuous_scale='Blues',
-                    aspect='auto',
-                    labels=dict(color='Revenue (M PKR)'))
-    fig.update_layout(
-        plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-        font_color='white', height=250,
-        xaxis_title='Month', yaxis_title='Year'
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption("💡 Darker = higher revenue. Oct–Dec consistently strongest months.")
-
-
-# ════════════════════════════════════════════════════════════
-# PAGE 3: PROMOTIONAL ANALYSIS
-# ════════════════════════════════════════════════════════════
-elif page == "💰 Promotional Analysis":
-
-    st.markdown("<h2 style='color:#00d4ff'>💰 Promotional Spend Analysis</h2>",
-                unsafe_allow_html=True)
-
-    # KPIs
-    c1,c2,c3,c4 = st.columns(4)
-    total_spend_filtered = df_a['TotalAmount'].sum()
-    with c1:
-        st.metric("Total Promo Spend",
-                  f"PKR {total_spend_filtered/1e9:.2f}B")
-    with c2:
-        st.metric("Total Requests",
-                  f"{df_a['RequestCount'].sum():,.0f}")
-    with c3:
-        st.metric("Avg per Request",
-                  f"PKR {total_spend_filtered/df_a['RequestCount'].sum():,.0f}")
-    with c4:
-        st.metric("Peak Year", "2025",
-                  delta="PKR 1.37B (+38.2%)")
-
-    st.markdown("---")
-
-    # ── SPEND TREND ──────────────────────────────────────────
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("<div class='section-header'>Promotional Spend Trend (2017–2026)</div>",
-                    unsafe_allow_html=True)
-        yearly_sp = df_a.groupby('Yr')['TotalAmount'].sum().reset_index()
-        fig = px.bar(yearly_sp, x='Yr', y='TotalAmount',
-                     color='TotalAmount',
-                     color_continuous_scale='Blues')
-        fig.add_scatter(x=yearly_sp['Yr'],
-                        y=yearly_sp['TotalAmount'],
-                        mode='lines+markers',
-                        line=dict(color='#00ff88', width=2),
-                        name='Trend')
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=320,
-            xaxis=dict(gridcolor='#2d2d44',
-                       tickmode='array',
-                       tickvals=yearly_sp['Yr']),
-            yaxis=dict(gridcolor='#2d2d44',
-                       title='Amount (PKR)'),
-            coloraxis_showscale=False,
-            showlegend=False
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        st.markdown("<div class='section-header'>Spend by Activity Type (Top 10)</div>",
-                    unsafe_allow_html=True)
-        act_sp = (df_a.groupby('ActivityHead')['TotalAmount']
-                  .sum().nlargest(10).reset_index())
-        fig = px.pie(act_sp, values='TotalAmount',
-                     names='ActivityHead',
-                     color_discrete_sequence=px.colors.sequential.Blues_r)
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=320
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ── TEAM & PRODUCT SPEND ─────────────────────────────────
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("<div class='section-header'>Top 10 Teams by Promo Spend</div>",
-                    unsafe_allow_html=True)
-        team_sp = (df_a.groupby('RequestorTeams')['TotalAmount']
-                   .sum().nlargest(10).reset_index())
-        fig = px.bar(team_sp, x='TotalAmount',
-                     y='RequestorTeams',
-                     orientation='h',
-                     color='TotalAmount',
-                     color_continuous_scale='Oranges')
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=350,
-            yaxis=dict(autorange='reversed'),
-            coloraxis_showscale=False,
-            xaxis_title='Total Spend (PKR)', yaxis_title=''
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        st.markdown("<div class='section-header'>Top 10 Products by Promo Investment</div>",
-                    unsafe_allow_html=True)
-        prod_sp = (df_a.groupby('Product')['TotalAmount']
-                   .sum().nlargest(10).reset_index())
-        fig = px.bar(prod_sp, x='TotalAmount', y='Product',
-                     orientation='h',
-                     color='TotalAmount',
-                     color_continuous_scale='Purples')
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=350,
-            yaxis=dict(autorange='reversed'),
-            coloraxis_showscale=False,
-            xaxis_title='Total Spend (PKR)', yaxis_title=''
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ── GL HEAD BREAKDOWN ────────────────────────────────────
-    st.markdown("<div class='section-header'>Budget Allocation by GL Head</div>",
-                unsafe_allow_html=True)
-    gl_sp = (df_a.groupby('GLHead')['TotalAmount']
-             .sum().nlargest(8).reset_index())
-    gl_sp['Pct'] = (gl_sp['TotalAmount'] /
-                    gl_sp['TotalAmount'].sum() * 100).round(1)
-
-    fig = make_subplots(rows=1, cols=2,
-                        specs=[[{"type":"bar"},{"type":"pie"}]])
-    fig.add_trace(go.Bar(
-        x=gl_sp['TotalAmount'], y=gl_sp['GLHead'],
-        orientation='h',
-        marker_color='#00d4ff', name='Amount'
-    ), row=1, col=1)
-    fig.add_trace(go.Pie(
-        values=gl_sp['TotalAmount'],
-        labels=gl_sp['GLHead'],
-        name='Share'
-    ), row=1, col=2)
-    fig.update_layout(
-        plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-        font_color='white', height=350, showlegend=False
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
-# ════════════════════════════════════════════════════════════
-# PAGE 4: COMBINED ROI ANALYSIS
-# ════════════════════════════════════════════════════════════
-elif page == "🔗 Combined ROI Analysis":
-
-    st.markdown("<h2 style='color:#00d4ff'>🔗 Combined ROI Analysis</h2>",
-                unsafe_allow_html=True)
-    st.markdown("*Linking promotional spend (2017–2026) with actual sales (2024–2026)*")
-
-    # Correlation callout
-    st.markdown("""
-    <div class='insight-box' style='font-size:16px'>
-    🔬 <b>Key Finding:</b> Promotional spend and same-month revenue 
-    have a <b>0.784 correlation</b> — a STRONG positive relationship.
-    Every PKR 1 invested in promotions generates PKR 20.3 in revenue on average.
-    </div>""", unsafe_allow_html=True)
-
-    # ── SPEND VS REVENUE ────────────────────────────────────
-    st.markdown("<div class='section-header'>Promo Spend vs Revenue (Monthly)</div>",
-                unsafe_allow_html=True)
-
-    monthly_sp = df_a.groupby('Date')['TotalAmount'].sum().reset_index()
-    monthly_rv = df_s.groupby('Date')['TotalRevenue'].sum().reset_index()
-    combo = pd.merge(monthly_sp, monthly_rv, on='Date', how='inner')
-
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Bar(
-        x=combo['Date'], y=combo['TotalAmount']/1e6,
-        name='Promo Spend (M PKR)',
-        marker_color='rgba(255,165,0,0.7)'
-    ), secondary_y=False)
-    fig.add_trace(go.Scatter(
-        x=combo['Date'], y=combo['TotalRevenue']/1e6,
-        name='Revenue (M PKR)',
-        line=dict(color='#00d4ff', width=3),
-        mode='lines+markers'
-    ), secondary_y=True)
-    fig.update_layout(
-        plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-        font_color='white', height=350,
-        hovermode='x unified',
-        legend=dict(bgcolor='#1a1d2e')
-    )
-    fig.update_yaxes(title_text="Promo Spend (M PKR)",
-                     gridcolor='#2d2d44', secondary_y=False)
-    fig.update_yaxes(title_text="Revenue (M PKR)",
-                     gridcolor='#2d2d44', secondary_y=True)
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ── ROI SCATTER ──────────────────────────────────────────
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("<div class='section-header'>ROI by Product (Bubble Chart)</div>",
-                    unsafe_allow_html=True)
-        roi_plot = df_roi[df_roi['TotalPromoSpend'] > 0].copy()
-        roi_plot = roi_plot[roi_plot['ROI'] < 200]
-
-        fig = px.scatter(roi_plot,
-                         x='TotalPromoSpend',
-                         y='TotalRevenue',
-                         size='ROI',
-                         color='ROI',
-                         hover_name='ProductName',
-                         color_continuous_scale='RdYlGn',
-                         size_max=50,
-                         labels={
-                             'TotalPromoSpend':'Promo Spend (PKR)',
-                             'TotalRevenue':'Revenue (PKR)'
-                         })
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=400
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("💡 Bigger bubble = higher ROI. Top-left = high ROI low spend = opportunity!")
-
-    with col2:
-        st.markdown("<div class='section-header'>Top 15 Products by ROI</div>",
-                    unsafe_allow_html=True)
-        top_roi = df_roi.nlargest(15,'ROI')
-        colors = ['#00ff88' if r > 50 else
-                  '#00d4ff' if r > 20 else
-                  '#ffa500' for r in top_roi['ROI']]
-        fig = go.Figure(go.Bar(
-            x=top_roi['ROI'],
-            y=top_roi['ProductName'],
-            orientation='h',
-            marker_color=colors,
-            text=[f"{r:.1f}x" for r in top_roi['ROI']],
-            textposition='outside'
-        ))
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=400,
-            yaxis=dict(autorange='reversed'),
-            xaxis_title='ROI (Revenue / Promo Spend)'
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ── TEAM ROI TABLE ───────────────────────────────────────
-    st.markdown("<div class='section-header'>Team ROI Summary</div>",
-                unsafe_allow_html=True)
-
-    team_roi_data = {
-        'Team': ['CHALLENGERS','METABOLIZERS','BONE SAVIORS',
-                 'LEGENDS','WARRIORS','BRAVO',
-                 'WINNERS','TITANS','ALPHA','CHAMPIONS'],
-        'Promo Spend (PKR)': [118634409,81731983,133620048,
-                               78147367,75495400,44872269,
-                               67180420,101703110,61419102,37460330],
-        'Revenue (PKR)': [4533914172,2380049006,2323743063,
-                          2096411088,1586697007,1521194946,
-                          1494926401,1331012729,1107743422,1074352302],
-        'ROI': [38.2,29.1,17.4,26.8,21.0,33.9,22.3,13.1,18.0,28.7]
-    }
-    team_roi_df = pd.DataFrame(team_roi_data)
-    team_roi_df['Promo Spend (PKR)'] = team_roi_df['Promo Spend (PKR)'].apply(
-        lambda x: f"PKR {x:,.0f}")
-    team_roi_df['Revenue (PKR)'] = team_roi_df['Revenue (PKR)'].apply(
-        lambda x: f"PKR {x:,.0f}")
-    team_roi_df['ROI'] = team_roi_df['ROI'].apply(lambda x: f"{x:.1f}x")
-    st.dataframe(team_roi_df, use_container_width=True, hide_index=True)
-
-
-# ════════════════════════════════════════════════════════════
-# PAGE 5: PREDICTIONS
-# ════════════════════════════════════════════════════════════
-elif page == "🔮 Predictions & Forecast":
-
-    st.markdown("<h2 style='color:#00d4ff'>🔮 Sales Prediction & Forecast</h2>",
-                unsafe_allow_html=True)
-
-    from sklearn.linear_model import LinearRegression
-    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-    from sklearn.metrics import mean_absolute_error, r2_score
-    from sklearn.model_selection import train_test_split
-    from sklearn.preprocessing import LabelEncoder
-    import numpy as np
-
-    # ── PREPARE ML DATA ──────────────────────────────────────
-    df_ml = df_merged.copy()
-    df_ml = df_ml[df_ml['Revenue'] > 0]
-    df_ml = df_ml[df_ml['PromoSpend'] > 0]
-
-    # Features
-    le_prod = LabelEncoder()
-    le_team = LabelEncoder()
-    df_ml['Product_enc'] = le_prod.fit_transform(df_ml['ProductName'])
-    df_ml['Team_enc']    = le_team.fit_transform(df_ml['TeamName'])
-    df_ml['Month_sin']   = np.sin(2*np.pi*df_ml['Mo']/12)
-    df_ml['Month_cos']   = np.cos(2*np.pi*df_ml['Mo']/12)
-
-    features = ['PromoSpend','Requests','Product_enc',
-                'Team_enc','Mo','Yr','Month_sin','Month_cos']
-    X = df_ml[features]
-    y = df_ml['Revenue']
-
-    X_train,X_test,y_train,y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42)
-
-    # ── TRAIN 3 MODELS ───────────────────────────────────────
-    models = {
-        'Linear Regression'     : LinearRegression(),
-        'Random Forest'         : RandomForestRegressor(
-            n_estimators=100, random_state=42),
-        'Gradient Boosting'     : GradientBoostingRegressor(
-            n_estimators=100, random_state=42)
-    }
-
-    results = {}
-    for name, model in models.items():
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
-        results[name] = {
-            'model'  : model,
-            'preds'  : preds,
-            'r2'     : r2_score(y_test, preds),
-            'mae'    : mean_absolute_error(y_test, preds)
-        }
-
-    # ── MODEL COMPARISON ─────────────────────────────────────
-    st.markdown("<div class='section-header'>Model Comparison</div>",
-                unsafe_allow_html=True)
-
-    c1,c2,c3 = st.columns(3)
-    colors_model = ['#ffa500','#00d4ff','#00ff88']
-    for col, (name, res), color in zip(
-            [c1,c2,c3], results.items(), colors_model):
-        with col:
-            st.markdown(f"""
-            <div class='kpi-card'>
-                <div class='kpi-label'>{name}</div>
-                <div class='kpi-value' style='color:{color}'>
-                    R² = {res['r2']:.3f}
-                </div>
-                <div class='kpi-delta'>
-                    MAE = PKR {res['mae']:,.0f}
-                </div>
-            </div>""", unsafe_allow_html=True)
-
-    # Best model
-    best_name = max(results, key=lambda k: results[k]['r2'])
-    best_res  = results[best_name]
-    best_model= best_res['model']
-
-    st.markdown(f"""
-    <div class='insight-box' style='margin-top:15px; font-size:15px'>
-    🏆 <b>Best Model: {best_name}</b> — R² = {best_res['r2']:.3f}<br>
-    This means the model explains {best_res['r2']*100:.1f}% of 
-    variance in sales revenue using promotional data.
-    </div>""", unsafe_allow_html=True)
-
-    # ── ACTUAL VS PREDICTED ───────────────────────────────────
-    st.markdown("<div class='section-header'>Actual vs Predicted Revenue</div>",
-                unsafe_allow_html=True)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=list(range(len(y_test))),
-        y=y_test.values/1e6,
-        name='Actual', mode='lines',
-        line=dict(color='#00d4ff', width=2)
-    ))
-    fig.add_trace(go.Scatter(
-        x=list(range(len(y_test))),
-        y=best_res['preds']/1e6,
-        name='Predicted', mode='lines',
-        line=dict(color='#00ff88', width=2, dash='dot')
-    ))
-    fig.update_layout(
-        plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-        font_color='white', height=320,
-        xaxis=dict(gridcolor='#2d2d44', title='Sample Index'),
-        yaxis=dict(gridcolor='#2d2d44', title='Revenue (M PKR)'),
-        hovermode='x unified'
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ── FEATURE IMPORTANCE ────────────────────────────────────
-    if hasattr(best_model, 'feature_importances_'):
-        st.markdown("<div class='section-header'>What Drives Sales? (Feature Importance)</div>",
-                    unsafe_allow_html=True)
-        fi = pd.DataFrame({
-            'Feature'   : features,
-            'Importance': best_model.feature_importances_
-        }).sort_values('Importance', ascending=False)
-
-        fig = px.bar(fi, x='Importance', y='Feature',
-                     orientation='h',
-                     color='Importance',
-                     color_continuous_scale='Blues')
-        fig.update_layout(
-            plot_bgcolor='#1a1d2e', paper_bgcolor='#1a1d2e',
-            font_color='white', height=300,
-            yaxis=dict(autorange='reversed'),
-            coloraxis_showscale=False
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ── FORECAST SIMULATOR ───────────────────────────────────
-    st.markdown("<div class='section-header'>🎯 Revenue Forecast Simulator</div>",
-                unsafe_allow_html=True)
-    st.markdown("*Predict revenue based on planned promotional spend*")
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        sim_spend = st.number_input(
-            "Promo Spend (PKR)",
-            min_value=100000,
-            max_value=50000000,
-            value=5000000,
-            step=500000)
-    with col2:
-        sim_month = st.selectbox(
-            "Month",
-            options=list(range(1,13)),
-            format_func=lambda x: list(months_map.values())[x-1]
-            if 'months_map' in dir() else str(x))
-    with col3:
-        sim_year = st.selectbox("Year", [2025, 2026])
-    with col4:
-        sim_requests = st.number_input(
-            "No. of Requests", 1, 100, 10)
-
-    if st.button("🔮 Predict Revenue", type="primary"):
-        sim_input = pd.DataFrame([{
-            'PromoSpend' : sim_spend,
-            'Requests'   : sim_requests,
-            'Product_enc': 0,
-            'Team_enc'   : 0,
-            'Mo'         : sim_month,
-            'Yr'         : sim_year,
-            'Month_sin'  : np.sin(2*np.pi*sim_month/12),
-            'Month_cos'  : np.cos(2*np.pi*sim_month/12)
-        }])
-        predicted = best_model.predict(sim_input)[0]
-        roi_sim   = predicted / sim_spend
-
-        c1,c2,c3 = st.columns(3)
-        with c1:
-            st.markdown(f"""
-            <div class='kpi-card'>
-                <div class='kpi-label'>Predicted Revenue</div>
-                <div class='kpi-value'>PKR {predicted/1e6:.1f}M</div>
-            </div>""", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"""
-            <div class='kpi-card'>
-                <div class='kpi-label'>Expected ROI</div>
-                <div class='kpi-value'>{roi_sim:.1f}x</div>
-            </div>""", unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"""
-            <div class='kpi-card'>
-                <div class='kpi-label'>Model Used</div>
-                <div class='kpi-value' style='font-size:16px'>
-                {best_name}</div>
-            </div>""", unsafe_allow_html=True)
-
-
-# ════════════════════════════════════════════════════════════
-# PAGE 6: ALERTS & OPPORTUNITIES
-# ════════════════════════════════════════════════════════════
-elif page == "🚨 Alerts & Opportunities":
-
-    st.markdown("<h2 style='color:#00d4ff'>🚨 Alerts & Strategic Opportunities</h2>",
-                unsafe_allow_html=True)
-
-    # ── OPPORTUNITIES ─────────────────────────────────────────
-    st.markdown("<div class='section-header'>🌟 Hidden Opportunities — Underinvested Products</div>",
-                unsafe_allow_html=True)
-    st.markdown("*High ROI but low promo spend — these deserve more budget!*")
-
-    opp = df_roi[
-        (df_roi['ROI'] > 20) &
-        (df_roi['TotalPromoSpend'] < df_roi['TotalPromoSpend'].median())
-    ].sort_values('ROI', ascending=False).head(10)
-
-    for _, row in opp.iterrows():
-        potential = row['ROI'] * row['TotalPromoSpend'] * 2
-        st.markdown(f"""
-        <div class='insight-box'>
-        🌟 <b>{row['ProductName']}</b> — ROI: <b>{row['ROI']:.1f}x</b><br>
-        Current spend: PKR {row['TotalPromoSpend']:,.0f} →
-        Revenue: PKR {row['TotalRevenue']:,.0f}<br>
-        <i>💡 Doubling spend could generate ~PKR {potential:,.0f} revenue</i>
-        </div>""", unsafe_allow_html=True)
-
-    # ── WARNINGS ─────────────────────────────────────────────
-    st.markdown("<div class='section-header'>⚠️ Budget Waste Alerts — Low ROI Products</div>",
-                unsafe_allow_html=True)
-    st.markdown("*High spend but low return — strategy review needed!*")
-
-    waste = df_roi[
-        (df_roi['ROI'] < 10) &
-        (df_roi['TotalPromoSpend'] > df_roi['TotalPromoSpend'].median())
-    ].sort_values('TotalPromoSpend', ascending=False).head(5)
-
-    for _, row in waste.iterrows():
-        wasted = row['TotalPromoSpend'] * (1 - row['ROI']/20)
-        st.markdown(f"""
-        <div class='warning-box'>
-        ⚠️ <b>{row['ProductName']}</b> — ROI: <b>{row['ROI']:.1f}x</b>
-        (vs 20x company average)<br>
-        Spent: PKR {row['TotalPromoSpend']:,.0f} →
-        Revenue: PKR {row['TotalRevenue']:,.0f}<br>
-        <i>🔍 Consider reviewing promotional strategy for this product</i>
-        </div>""", unsafe_allow_html=True)
-
-    # ── STRATEGIC RECOMMENDATIONS ────────────────────────────
-    st.markdown("<div class='section-header'>📋 Strategic Recommendations</div>",
-                unsafe_allow_html=True)
-
-    recs = [
-        ("Reallocate Budget", "Move 20% of Shevit/Ferfer budget to Ramipace/Xcept — could add PKR 500M+ in revenue", "insight-box"),
-        ("Scale X-Plended", "Top revenue product at PKR 4.3B with 21.9% growth — increase promo investment", "insight-box"),
-        ("Focus on Oct-Dec", "Historically strongest sales months — concentrate promotional events here", "insight-box"),
-        ("Team Challengers", "Highest ROI team at 38.2x — replicate their strategy across other teams", "insight-box"),
-        ("Finno-Q Alert", "226% growth in 2025 — emerging product needs immediate promotional support", "insight-box"),
-        ("COVID Resilience", "2021 recovery showed +68.6% bounce — maintain emergency promo budget reserve", "insight-box"),
+    possible_models = [
+        Path.cwd() / "models",
+        Path.home() / "models",
+        Path.home() / "Desktop" / "FYP 2026" / "models",
+        Path("models"),
     ]
-    for title, desc, cls in recs:
-        st.markdown(f"""
-        <div class='{cls}'>
-        <b>{title}:</b> {desc}
-        </div>""", unsafe_allow_html=True)
 
-    # ── QUICK WINS TABLE ─────────────────────────────────────
-    st.markdown("<div class='section-header'>⚡ Quick Wins Summary Table</div>",
-                unsafe_allow_html=True)
+    data_dir = next((p for p in possible_data if p.exists()), None)
+    models_dir = next((p for p in possible_models if p.exists()), None)
 
-    quick = pd.DataFrame({
-        'Action'         : ['Increase Ramipace budget 2x',
-                            'Increase Xcept budget 2x',
-                            'Cut Shevit budget 50%',
-                            'Cut Ferfer budget 30%',
-                            'Boost Oct-Dec campaigns'],
-        'Current Spend'  : ['PKR 4.3M','PKR 5.2M',
-                            'PKR 29M','PKR 47M','Varies'],
-        'Expected Impact': ['+PKR 430M revenue','+PKR 395M revenue',
-                            'Save PKR 14.5M','Save PKR 14.2M',
-                            '+15% Q4 revenue'],
-        'Priority'       : ['🔴 HIGH','🔴 HIGH',
-                            '🟡 MEDIUM','🟡 MEDIUM','🟢 LOW']
-    })
-    st.dataframe(quick, use_container_width=True, hide_index=True)
+    return data_dir, models_dir
+
+
+# ============================================================
+# DATA LOADING
+# ============================================================
+@st.cache_data
+def load_test_data(data_dir):
+    """Load test set for predictions and analysis."""
+    test_path = data_dir / "processed" / "test.csv"
+    if not test_path.exists():
+        return None
+    df = pd.read_csv(test_path, low_memory=False)
+    df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
+    return df
+
+
+@st.cache_data
+def load_master_data(data_dir):
+    """Load master raw data for historical trends."""
+    master_path = data_dir / "raw" / "master_weather_data.csv"
+    if not master_path.exists():
+        return None
+    df = pd.read_csv(master_path, low_memory=False)
+    df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
+    return df
+
+
+@st.cache_data
+def load_city_metadata(data_dir):
+    """Load city metadata."""
+    meta_path = data_dir / "raw" / "city_metadata.json"
+    if meta_path.exists():
+        with open(meta_path) as f:
+            return json.load(f)
+    return {}
+
+
+@st.cache_resource
+def load_models(models_dir):
+    """Load all trained models."""
+    models = {}
+    model_files = {
+        "temperature": "pipeline_A_temperature_xgb.pkl",
+        "temp_q10": "pipeline_A_q10.pkl",
+        "temp_q90": "pipeline_A_q90.pkl",
+        "rainfall": "pipeline_B_rainfall_xgb.pkl",
+        "heatwave": "pipeline_C_heatwave_xgb.pkl",
+        "disaster": "pipeline_D_disaster_xgb.pkl",
+    }
+    for key, filename in model_files.items():
+        path = models_dir / filename
+        if path.exists():
+            models[key] = joblib.load(path)
+    return models
+
+
+@st.cache_data
+def load_metrics(data_dir):
+    """Load all pipeline metrics."""
+    metrics = {}
+    reports_dir = data_dir / "reports"
+    for pipeline in ["A", "B", "C", "D"]:
+        path = reports_dir / f"pipeline_{pipeline}_metrics.json"
+        if path.exists():
+            with open(path) as f:
+                metrics[pipeline] = json.load(f)
+    return metrics
+
+
+def get_feature_columns(df):
+    exclude = {"datetime", "city", "country", "continent", "climate_zone",
+               "heatwave_threshold", "target_rain", "target_heatwave",
+               "target_storm", "target_disaster", "target_temperature_next"}
+    return [c for c in df.columns if c not in exclude]
+
+
+# ============================================================
+# ALERT SYSTEM
+# ============================================================
+def get_alert_level(temp_pred, rain_prob, heatwave_prob, disaster_class):
+    """Determine alert level based on predictions."""
+    if disaster_class == 3 or rain_prob > 0.8:
+        return "RED", "🚨 SEVERE WEATHER ALERT", "alert-red"
+    elif disaster_class == 1 or heatwave_prob > 0.7 or temp_pred > 42:
+        return "ORANGE", "⚠️ HEATWAVE WARNING", "alert-orange"
+    elif disaster_class == 2 or rain_prob > 0.5:
+        return "YELLOW", "⛈️ RAIN ADVISORY", "alert-yellow"
+    else:
+        return "GREEN", "✅ NORMAL CONDITIONS", "alert-green"
+
+
+# ============================================================
+# MAIN APP
+# ============================================================
+def main():
+    # Header
+    st.markdown('<div class="main-header">🌦️ AI Extreme Weather Prediction System</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">20 Global Cities · 4 ML Pipelines · Real-Time Predictions with Uncertainty & Explainability</div>', unsafe_allow_html=True)
+
+    # Detect paths
+    data_dir, models_dir = detect_paths()
+
+    if data_dir is None:
+        st.error("❌ Data directory not found. Please ensure the 'data' folder exists.")
+        st.stop()
+
+    # Load everything
+    test_df = load_test_data(data_dir)
+    master_df = load_master_data(data_dir)
+    city_meta = load_city_metadata(data_dir)
+    models = load_models(models_dir) if models_dir else {}
+    metrics = load_metrics(data_dir)
+
+    if test_df is None:
+        st.error("❌ Test data not found. Run preprocessing (File 2) first.")
+        st.stop()
+
+    # ── SIDEBAR ──
+    st.sidebar.image("https://img.icons8.com/clouds/100/000000/partly-cloudy-day.png", width=80)
+    st.sidebar.title("🌍 Controls")
+
+    cities = sorted(test_df["city"].unique())
+    selected_city = st.sidebar.selectbox("🏙️ Select City", cities, index=cities.index("Karachi") if "Karachi" in cities else 0)
+
+    # City info
+    if selected_city in city_meta:
+        info = city_meta[selected_city]
+        st.sidebar.markdown(f"""
+        **Country:** {info.get('country', 'N/A')}
+        **Continent:** {info.get('continent', 'N/A')}
+        **Climate:** {info.get('climate_zone', 'N/A')}
+        **Coastal:** {'Yes 🌊' if info.get('coastal') else 'No 🏔️'}
+        """)
+
+    coastal_filter = st.sidebar.radio("🌊 Filter", ["All Cities", "Coastal Only", "Non-Coastal Only"])
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**📊 Model Status**")
+    for key, name in [("temperature", "Pipeline A (Temp)"), ("rainfall", "Pipeline B (Rain)"),
+                      ("heatwave", "Pipeline C (Heat)"), ("disaster", "Pipeline D (Disaster)")]:
+        status = "✅" if key in models else "❌"
+        st.sidebar.markdown(f"{status} {name}")
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("*Built by Syed Bilal, Raiyan Sheikh & Numra Amjad*")
+    st.sidebar.markdown("*SMIU, Karachi · 2025*")
+
+    # Filter data by city
+    city_df = test_df[test_df["city"] == selected_city].copy()
+    features = get_feature_columns(test_df)
+
+    # ── TABS ──
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "🔮 Live Predictions",
+        "🧠 SHAP Explainability",
+        "📈 Historical Trends",
+        "📊 Model Performance",
+        "🔍 Data Explorer",
+    ])
+
+    # ============================================================
+    # TAB 1 — LIVE PREDICTIONS
+    # ============================================================
+    with tab1:
+        st.header(f"🔮 Predictions for {selected_city}")
+
+        if len(city_df) == 0:
+            st.warning("No data available for this city.")
+        else:
+            # Use last available data point for "current" prediction
+            latest = city_df.iloc[-1:]
+            X_latest = latest[features]
+
+            # Make predictions
+            temp_pred = models["temperature"].predict(X_latest)[0] if "temperature" in models else latest["temperature_2m"].values[0]
+            temp_q10 = models["temp_q10"].predict(X_latest)[0] if "temp_q10" in models else temp_pred - 2
+            temp_q90 = models["temp_q90"].predict(X_latest)[0] if "temp_q90" in models else temp_pred + 2
+
+            rain_prob = models["rainfall"].predict_proba(X_latest)[0][1] if "rainfall" in models else 0.0
+            heat_prob = models["heatwave"].predict_proba(X_latest)[0][1] if "heatwave" in models else 0.0
+
+            disaster_class = int(models["disaster"].predict(X_latest)[0]) if "disaster" in models else 0
+            disaster_probs = models["disaster"].predict_proba(X_latest)[0] if "disaster" in models else [1, 0, 0, 0]
+            disaster_names = {0: "Normal", 1: "Heatwave", 2: "Heavy Rain", 3: "Storm"}
+            disaster_confidence = float(max(disaster_probs))
+
+            # Alert system
+            alert_level, alert_text, alert_class = get_alert_level(temp_pred, rain_prob, heat_prob, disaster_class)
+            st.markdown(f'<div class="{alert_class}">{alert_text} — Alert Level: {alert_level}</div>', unsafe_allow_html=True)
+            st.markdown("")
+
+            # Prediction cards
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:0.9rem; opacity:0.8;">🌡️ Temperature</div>
+                    <div style="font-size:2rem; font-weight:bold;">{temp_pred:.1f}°C</div>
+                    <div style="font-size:0.8rem; opacity:0.7;">CI: [{temp_q10:.1f} — {temp_q90:.1f}]°C</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                rain_color = "#4CAF50" if rain_prob < 0.3 else "#FF9800" if rain_prob < 0.7 else "#F44336"
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:0.9rem; opacity:0.8;">🌧️ Rainfall Probability</div>
+                    <div style="font-size:2rem; font-weight:bold; color:{rain_color};">{rain_prob*100:.0f}%</div>
+                    <div style="font-size:0.8rem; opacity:0.7;">{'Heavy rain likely' if rain_prob > 0.5 else 'Low risk'}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                heat_color = "#4CAF50" if heat_prob < 0.3 else "#FF9800" if heat_prob < 0.7 else "#F44336"
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:0.9rem; opacity:0.8;">☀️ Heatwave Risk</div>
+                    <div style="font-size:2rem; font-weight:bold; color:{heat_color};">{heat_prob*100:.0f}%</div>
+                    <div style="font-size:0.8rem; opacity:0.7;">{'⚠️ High risk!' if heat_prob > 0.5 else 'Low risk'}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col4:
+                disaster_color = {"Normal": "#4CAF50", "Heatwave": "#FF9800", "Heavy Rain": "#2196F3", "Storm": "#F44336"}
+                dc_name = disaster_names[disaster_class]
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:0.9rem; opacity:0.8;">🚨 Disaster Classification</div>
+                    <div style="font-size:1.5rem; font-weight:bold; color:{disaster_color.get(dc_name, 'white')};">{dc_name}</div>
+                    <div style="font-size:0.8rem; opacity:0.7;">Confidence: {disaster_confidence*100:.0f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("")
+
+            # Temperature forecast with uncertainty band (last 7 days)
+            st.subheader("🌡️ Temperature Forecast with Uncertainty")
+            n_show = min(24 * 7, len(city_df))
+            recent = city_df.tail(n_show).copy()
+
+            if "temperature" in models and len(recent) > 0:
+                X_recent = recent[features]
+                recent["pred"] = models["temperature"].predict(X_recent)
+                recent["q10"] = models["temp_q10"].predict(X_recent) if "temp_q10" in models else recent["pred"] - 2
+                recent["q90"] = models["temp_q90"].predict(X_recent) if "temp_q90" in models else recent["pred"] + 2
+
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=recent["datetime"], y=recent["temperature_2m"],
+                                         mode="lines", name="Actual", line=dict(color="#FF5722", width=2)))
+                fig.add_trace(go.Scatter(x=recent["datetime"], y=recent["pred"],
+                                         mode="lines", name="Predicted", line=dict(color="#2196F3", width=2)))
+                fig.add_trace(go.Scatter(
+                    x=pd.concat([recent["datetime"], recent["datetime"][::-1]]),
+                    y=pd.concat([recent["q90"], recent["q10"][::-1]]),
+                    fill="toself", fillcolor="rgba(33,150,243,0.15)",
+                    line=dict(width=0), name="80% Confidence Interval",
+                ))
+                fig.update_layout(
+                    title=f"Temperature Forecast — {selected_city} (Last 7 Days)",
+                    xaxis_title="Date", yaxis_title="Temperature (°C)",
+                    template="plotly_dark", height=450,
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            # Disaster probability breakdown
+            st.subheader("🚨 Disaster Probability Breakdown")
+            prob_df = pd.DataFrame({
+                "Category": list(disaster_names.values()),
+                "Probability": [float(p) for p in disaster_probs],
+            })
+            fig_prob = px.bar(prob_df, x="Category", y="Probability",
+                              color="Category",
+                              color_discrete_map={"Normal": "#4CAF50", "Heatwave": "#FF9800",
+                                                  "Heavy Rain": "#2196F3", "Storm": "#F44336"},
+                              template="plotly_dark", title="Disaster Class Probabilities")
+            fig_prob.update_layout(height=350, showlegend=False)
+            st.plotly_chart(fig_prob, use_container_width=True)
+
+    # ============================================================
+    # TAB 2 — SHAP EXPLAINABILITY
+    # ============================================================
+    with tab2:
+        st.header("🧠 SHAP Explainability")
+
+        pipeline_choice = st.selectbox("Select Pipeline", [
+            "Pipeline A — Temperature",
+            "Pipeline B — Rainfall",
+            "Pipeline C — Heatwave",
+            "Pipeline D — Disaster",
+        ])
+
+        pipeline_map = {"Pipeline A — Temperature": "A", "Pipeline B — Rainfall": "B",
+                        "Pipeline C — Heatwave": "C", "Pipeline D — Disaster": "D"}
+        pl = pipeline_map[pipeline_choice]
+
+        figures_dir = data_dir / "reports" / "figures"
+
+        col1, col2 = st.columns(2)
+
+        # SHAP Beeswarm
+        beeswarm = figures_dir / f"pipeline_{pl}_shap_beeswarm.png"
+        if beeswarm.exists():
+            with col1:
+                st.image(str(beeswarm), caption=f"SHAP Beeswarm — Pipeline {pl}", use_container_width=True)
+        else:
+            with col1:
+                st.info(f"Beeswarm plot not found for Pipeline {pl}")
+
+        # SHAP Bar
+        bar_file = figures_dir / f"pipeline_{pl}_shap_bar.png"
+        if not bar_file.exists():
+            bar_file = figures_dir / f"pipeline_{pl}_shap_bar_overall.png"
+        if bar_file.exists():
+            with col2:
+                st.image(str(bar_file), caption=f"Feature Importance — Pipeline {pl}", use_container_width=True)
+
+        # Waterfall
+        waterfall = figures_dir / f"pipeline_{pl}_shap_waterfall.png"
+        if waterfall.exists():
+            st.image(str(waterfall), caption=f"SHAP Waterfall (Single Prediction) — Pipeline {pl}", use_container_width=True)
+
+        # Top features table
+        top_path = data_dir / "reports" / f"pipeline_{pl}_top_features.csv"
+        if top_path.exists():
+            st.subheader(f"📋 Top Features — Pipeline {pl}")
+            top_df = pd.read_csv(top_path)
+            st.dataframe(top_df, use_container_width=True, hide_index=True)
+
+        # LIME (Pipeline B only)
+        if pl == "B":
+            st.subheader("🧪 LIME Explanations")
+            for i in range(1, 4):
+                lime_path = figures_dir / f"pipeline_B_lime_instance_{i}.png"
+                if lime_path.exists():
+                    st.image(str(lime_path), caption=f"LIME — Instance {i}", use_container_width=True)
+
+    # ============================================================
+    # TAB 3 — HISTORICAL TRENDS
+    # ============================================================
+    with tab3:
+        st.header("📈 Historical Trends")
+
+        data_source = master_df if master_df is not None else test_df
+        city_hist = data_source[data_source["city"] == selected_city].copy()
+
+        if len(city_hist) == 0:
+            st.warning("No historical data for this city.")
+        else:
+            city_hist["year"] = city_hist["datetime"].dt.year
+            city_hist["month"] = city_hist["datetime"].dt.month
+
+            # Temperature trend
+            st.subheader("🌡️ Temperature Trend (2009–2023)")
+            yearly_temp = city_hist.groupby("year")["temperature_2m"].agg(["mean", "min", "max"]).reset_index()
+            fig_temp = go.Figure()
+            fig_temp.add_trace(go.Scatter(x=yearly_temp["year"], y=yearly_temp["mean"],
+                                          mode="lines+markers", name="Mean", line=dict(color="#FF5722", width=3)))
+            fig_temp.add_trace(go.Scatter(x=yearly_temp["year"], y=yearly_temp["max"],
+                                          mode="lines", name="Max", line=dict(color="#F44336", dash="dot")))
+            fig_temp.add_trace(go.Scatter(x=yearly_temp["year"], y=yearly_temp["min"],
+                                          mode="lines", name="Min", line=dict(color="#2196F3", dash="dot")))
+            fig_temp.update_layout(title=f"Temperature Trend — {selected_city}",
+                                   xaxis_title="Year", yaxis_title="Temperature (°C)",
+                                   template="plotly_dark", height=400)
+            st.plotly_chart(fig_temp, use_container_width=True)
+
+            # Heatwave frequency
+            st.subheader("☀️ Heatwave Hours per Year")
+            threshold = 40.0 if selected_city in ["Karachi", "Delhi", "Mumbai", "Dhaka"] else 35.0
+            city_hist["is_heatwave"] = (city_hist["temperature_2m"] >= threshold).astype(int)
+            hw_yearly = city_hist.groupby("year")["is_heatwave"].sum().reset_index()
+            hw_yearly.columns = ["year", "heatwave_hours"]
+
+            fig_hw = px.bar(hw_yearly, x="year", y="heatwave_hours",
+                            color="heatwave_hours", color_continuous_scale="YlOrRd",
+                            template="plotly_dark",
+                            title=f"Heatwave Hours per Year — {selected_city} (threshold: {threshold}°C)")
+            fig_hw.update_layout(height=400)
+            st.plotly_chart(fig_hw, use_container_width=True)
+
+            # Rainfall distribution
+            st.subheader("🌧️ Monthly Rainfall Distribution")
+            monthly_rain = city_hist.groupby("month")["precipitation"].sum().reset_index()
+            month_names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+            monthly_rain["month_name"] = monthly_rain["month"].apply(lambda x: month_names[x-1])
+
+            fig_rain = px.bar(monthly_rain, x="month_name", y="precipitation",
+                              color="precipitation", color_continuous_scale="Blues",
+                              template="plotly_dark",
+                              title=f"Total Precipitation by Month — {selected_city}")
+            fig_rain.update_layout(height=400, xaxis_title="Month", yaxis_title="Total Precipitation (mm)")
+            st.plotly_chart(fig_rain, use_container_width=True)
+
+            # Wind speed extremes
+            st.subheader("💨 Wind Speed Distribution")
+            fig_wind = px.histogram(city_hist, x="windspeed_10m", nbins=50,
+                                     color_discrete_sequence=["#26A69A"],
+                                     template="plotly_dark",
+                                     title=f"Wind Speed Distribution — {selected_city}")
+            fig_wind.add_vline(x=40, line_dash="dash", line_color="red",
+                               annotation_text="Storm threshold (40 km/h)")
+            fig_wind.update_layout(height=350, xaxis_title="Wind Speed (km/h)", yaxis_title="Count")
+            st.plotly_chart(fig_wind, use_container_width=True)
+
+    # ============================================================
+    # TAB 4 — MODEL PERFORMANCE
+    # ============================================================
+    with tab4:
+        st.header("📊 Model Performance Dashboard")
+
+        if not metrics:
+            st.warning("No metrics found. Run all 4 pipelines first.")
+        else:
+            # Summary table
+            st.subheader("📋 All Pipelines — Performance Summary")
+            summary_rows = []
+            if "A" in metrics:
+                m = metrics["A"].get("test_metrics", {})
+                summary_rows.append({
+                    "Pipeline": "A — Temperature",
+                    "Task": "Regression",
+                    "Primary Metric": f"RMSE = {m.get('rmse', 'N/A')}°C",
+                    "R²": m.get("r2", "N/A"),
+                    "Secondary": f"MAE = {m.get('mae', 'N/A')}°C",
+                })
+            if "B" in metrics:
+                m = metrics["B"].get("test_metrics", {})
+                summary_rows.append({
+                    "Pipeline": "B — Rainfall",
+                    "Task": "Binary Classification",
+                    "Primary Metric": f"F1 = {m.get('f1_score', 'N/A')}",
+                    "R²": f"AUC = {m.get('roc_auc', 'N/A')}",
+                    "Secondary": f"Brier = {m.get('brier_score', 'N/A')}",
+                })
+            if "C" in metrics:
+                m = metrics["C"].get("test_metrics", {})
+                summary_rows.append({
+                    "Pipeline": "C — Heatwave",
+                    "Task": "Binary Classification",
+                    "Primary Metric": f"F1 = {m.get('f1_score', 'N/A')}",
+                    "R²": f"AUC = {m.get('roc_auc', 'N/A')}",
+                    "Secondary": f"Brier = {m.get('brier_score', 'N/A')}",
+                })
+            if "D" in metrics:
+                m = metrics["D"].get("test_metrics", {})
+                summary_rows.append({
+                    "Pipeline": "D — Disaster",
+                    "Task": "Multi-Class",
+                    "Primary Metric": f"wF1 = {m.get('weighted_f1', 'N/A')}",
+                    "R²": f"mF1 = {m.get('macro_f1', 'N/A')}",
+                    "Secondary": f"Acc = {m.get('accuracy', 'N/A')}",
+                })
+
+            if summary_rows:
+                st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+
+            # Show figures
+            st.subheader("📊 Evaluation Figures")
+            figures_dir = data_dir / "reports" / "figures"
+
+            fig_col1, fig_col2 = st.columns(2)
+
+            # Confusion matrices
+            for pl, col in [("B", fig_col1), ("C", fig_col2)]:
+                cm_path = figures_dir / f"pipeline_{pl}_confusion_matrix.png"
+                if cm_path.exists():
+                    with col:
+                        st.image(str(cm_path), caption=f"Confusion Matrix — Pipeline {pl}", use_container_width=True)
+
+            # ROC curves
+            fig_col3, fig_col4 = st.columns(2)
+            for pl, col in [("C", fig_col3), ("D", fig_col4)]:
+                roc_path = figures_dir / f"pipeline_{pl}_roc_curve.png"
+                if not roc_path.exists():
+                    roc_path = figures_dir / f"pipeline_{pl}_roc_per_class.png"
+                if roc_path.exists():
+                    with col:
+                        st.image(str(roc_path), caption=f"ROC Curve — Pipeline {pl}", use_container_width=True)
+
+            # Calibration curves
+            fig_col5, fig_col6 = st.columns(2)
+            for pl, col in [("B", fig_col5), ("C", fig_col6)]:
+                cal_path = figures_dir / f"pipeline_{pl}_calibration_curve.png"
+                if cal_path.exists():
+                    with col:
+                        st.image(str(cal_path), caption=f"Calibration — Pipeline {pl}", use_container_width=True)
+
+            # Pipeline A specific
+            for fname, caption in [
+                ("pipeline_A_predictions_vs_actual.png", "Predictions vs Actual (Temperature)"),
+                ("pipeline_A_residuals.png", "Residual Analysis (Temperature)"),
+                ("pipeline_A_baseline_comparison.png", "Model vs Baseline (Temperature)"),
+            ]:
+                fpath = figures_dir / fname
+                if fpath.exists():
+                    st.image(str(fpath), caption=caption, use_container_width=True)
+
+            # Uncertainty plots
+            for fname, caption in [
+                ("pipeline_A_uncertainty_Karachi.png", "Uncertainty — Karachi"),
+                ("pipeline_A_uncertainty_Mumbai.png", "Uncertainty — Mumbai"),
+                ("pipeline_D_entropy_uncertainty.png", "Entropy Uncertainty — Disaster"),
+            ]:
+                fpath = figures_dir / fname
+                if fpath.exists():
+                    st.image(str(fpath), caption=caption, use_container_width=True)
+
+    # ============================================================
+    # TAB 5 — DATA EXPLORER
+    # ============================================================
+    with tab5:
+        st.header("🔍 Data Explorer")
+
+        data_source_choice = st.radio("Data Source", ["Test Set (2019-2020)", "Full Dataset (2009-2023)"])
+        explore_df = test_df if "Test" in data_source_choice else (master_df if master_df is not None else test_df)
+
+        # City filter
+        explore_city = st.selectbox("Select City for Exploration", ["All Cities"] + sorted(explore_df["city"].unique()))
+        if explore_city != "All Cities":
+            explore_df = explore_df[explore_df["city"] == explore_city]
+
+        st.subheader(f"📋 Data Preview ({len(explore_df):,} rows)")
+        st.dataframe(explore_df.head(500), use_container_width=True, height=400)
+
+        # Descriptive statistics
+        st.subheader("📊 Descriptive Statistics")
+        numeric_cols = ["temperature_2m", "relative_humidity_2m", "precipitation",
+                        "windspeed_10m", "surface_pressure", "cloudcover", "shortwave_radiation"]
+        available_cols = [c for c in numeric_cols if c in explore_df.columns]
+        if available_cols:
+            st.dataframe(explore_df[available_cols].describe().round(2), use_container_width=True)
+
+        # Correlation heatmap
+        st.subheader("🔥 Correlation Heatmap")
+        if available_cols and len(explore_df) > 0:
+            corr = explore_df[available_cols].corr()
+            fig_corr = px.imshow(corr, text_auto=".2f", color_continuous_scale="RdBu_r",
+                                 title="Feature Correlation Matrix", template="plotly_dark",
+                                 aspect="auto")
+            fig_corr.update_layout(height=500)
+            st.plotly_chart(fig_corr, use_container_width=True)
+
+        # Download option
+        st.subheader("📥 Download Data")
+        csv = explore_df.head(10000).to_csv(index=False)
+        st.download_button("Download CSV (first 10,000 rows)", csv,
+                           f"weather_data_{explore_city}.csv", "text/csv")
+
+
+# ============================================================
+# RUN
+# ============================================================
+if __name__ == "__main__":
+    main()
