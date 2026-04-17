@@ -104,7 +104,9 @@ def detect_paths():
 @st.cache_data
 def load_test_data(data_dir):
     """Load test set for predictions and analysis."""
-    test_path = data_dir / "processed" / "test.csv"
+    test_path = data_dir / "processed" / "test.csv.gz"
+    if not test_path.exists():
+        test_path = data_dir / "processed" / "test.csv"
     if not test_path.exists():
         return None
     df = pd.read_csv(test_path, low_memory=False)
