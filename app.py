@@ -78,6 +78,7 @@ def load_test_data(data_dir):
         if p.exists():
             df = pd.read_csv(p, low_memory=False)
             df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
+            df = add_missing_columns(df)
             return df
     return None
 
@@ -118,12 +119,77 @@ def load_metrics(data_dir):
                 metrics[pl] = json.load(f)
     return metrics
 
+# Exact feature list the model was trained on
+EXACT_FEATURES = [
+    "temperature_2m","relative_humidity_2m","precipitation",
+    "windspeed_10m","surface_pressure","cloudcover","shortwave_radiation",
+    "latitude","longitude","coastal",
+    "hour","day","day_of_week","month","year","day_of_year","is_weekend","season",
+    "temperature_2m_lag_24h","temperature_2m_lag_48h","temperature_2m_lag_72h",
+    "relative_humidity_2m_lag_24h","relative_humidity_2m_lag_48h","relative_humidity_2m_lag_72h",
+    "precipitation_lag_24h","precipitation_lag_48h","precipitation_lag_72h",
+    "windspeed_10m_lag_24h","windspeed_10m_lag_48h","windspeed_10m_lag_72h",
+    "temperature_2m_roll_24h_mean","temperature_2m_roll_24h_std",
+    "temperature_2m_roll_7d_mean","temperature_2m_roll_7d_std",
+    "relative_humidity_2m_roll_24h_mean","relative_humidity_2m_roll_24h_std",
+    "relative_humidity_2m_roll_7d_mean","relative_humidity_2m_roll_7d_std",
+    "precipitation_roll_24h_mean","precipitation_roll_24h_std",
+    "precipitation_roll_7d_mean","precipitation_roll_7d_std",
+    "windspeed_10m_roll_24h_mean","windspeed_10m_roll_24h_std",
+    "windspeed_10m_roll_7d_mean","windspeed_10m_roll_7d_std",
+    "city_id","continent_id","climate_zone_id",
+]
+
+CITY_META = {
+    "Karachi":{"lat":24.86,"lon":67.01,"coastal":1,"climate_zone":"Arid"},
+    "Mumbai":{"lat":19.08,"lon":72.88,"coastal":1,"climate_zone":"Tropical"},
+    "Delhi":{"lat":28.61,"lon":77.21,"coastal":0,"climate_zone":"Semi-Arid"},
+    "Dhaka":{"lat":23.81,"lon":90.41,"coastal":1,"climate_zone":"Tropical"},
+    "Tokyo":{"lat":35.68,"lon":139.65,"coastal":1,"climate_zone":"Temperate"},
+    "Jakarta":{"lat":-6.21,"lon":106.85,"coastal":1,"climate_zone":"Tropical"},
+    "Lagos":{"lat":6.52,"lon":3.38,"coastal":1,"climate_zone":"Tropical"},
+    "Nairobi":{"lat":-1.29,"lon":36.82,"coastal":0,"climate_zone":"Temperate"},
+    "Cape_Town":{"lat":-33.92,"lon":18.42,"coastal":1,"climate_zone":"Mediterranean"},
+    "Cairo":{"lat":30.04,"lon":31.24,"coastal":0,"climate_zone":"Arid"},
+    "Miami":{"lat":25.76,"lon":-80.19,"coastal":1,"climate_zone":"Tropical"},
+    "Chicago":{"lat":41.88,"lon":-87.63,"coastal":0,"climate_zone":"Continental"},
+    "Phoenix":{"lat":33.45,"lon":-112.07,"coastal":0,"climate_zone":"Arid"},
+    "Sao_Paulo":{"lat":-23.55,"lon":-46.63,"coastal":0,"climate_zone":"Tropical"},
+    "Rotterdam":{"lat":51.92,"lon":4.48,"coastal":1,"climate_zone":"Temperate"},
+    "Madrid":{"lat":40.42,"lon":-3.70,"coastal":0,"climate_zone":"Mediterranean"},
+    "Moscow":{"lat":55.76,"lon":37.62,"coastal":0,"climate_zone":"Continental"},
+    "Ulaanbaatar":{"lat":47.89,"lon":106.91,"coastal":0,"climate_zone":"Continental"},
+    "Sydney":{"lat":-33.87,"lon":151.21,"coastal":1,"climate_zone":"Temperate"},
+    "Riyadh":{"lat":24.71,"lon":46.68,"coastal":0,"climate_zone":"Arid"},
+}
+CZ_MAP   = {"Arid":0,"Continental":1,"Mediterranean":2,"Semi-Arid":3,"Temperate":4,"Tropical":5}
+CONT_MAP = {"Africa":0,"Americas":1,"Asia":2,"Europe":3,"Oceania":4}
+
+def add_missing_columns(df):
+    """Add any columns the model needs that might be missing from the CSV."""
+    df = df.copy()
+    if "latitude" not in df.columns:
+        df["latitude"]  = df["city"].map({k:v["lat"] for k,v in CITY_META.items()}).fillna(0)
+    if "longitude" not in df.columns:
+        df["longitude"] = df["city"].map({k:v["lon"] for k,v in CITY_META.items()}).fillna(0)
+    if "coastal" not in df.columns:
+        df["coastal"]   = df["city"].map({k:v["coastal"] for k,v in CITY_META.items()}).fillna(0)
+    if "climate_zone" not in df.columns:
+        df["climate_zone"] = df["city"].map({k:v["climate_zone"] for k,v in CITY_META.items()}).fillna("Temperate")
+    if "continent" not in df.columns:
+        df["continent"] = "Asia"
+    if "climate_zone_id" not in df.columns:
+        df["climate_zone_id"] = df["climate_zone"].map(CZ_MAP).fillna(4)
+    if "continent_id" not in df.columns:
+        df["continent_id"] = df["continent"].map(CONT_MAP).fillna(2)
+    if "city_id" not in df.columns:
+        city_list = sorted(df["city"].unique())
+        df["city_id"] = df["city"].map({c:i for i,c in enumerate(city_list)})
+    df.fillna(0, inplace=True)
+    return df
+
 def get_feature_columns(df):
-    exclude = {"datetime","city","country","continent","climate_zone",
-               "heatwave_threshold","coastal","latitude","longitude",
-               "target_rain","target_heatwave","target_storm",
-               "target_disaster","target_temperature_next"}
-    return [c for c in df.columns if c not in exclude]
+    return [f for f in EXACT_FEATURES if f in df.columns]
 
 def get_alert(temp, rain_prob, heat_prob, disaster):
     if disaster == 3 or rain_prob > 0.8:
