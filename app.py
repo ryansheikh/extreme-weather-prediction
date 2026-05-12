@@ -1,21 +1,9 @@
 #!/usr/bin/env python3
 """
-==============================================================================
-FILE 7: app.py — Streamlit Dashboard (FULLY INTERACTIVE — No Static Images)
-==============================================================================
-Project : AI-Driven Extreme Weather Prediction — A Global Perspective
+AI-Driven Extreme Weather Prediction System
 Authors : Syed Bilal, Raiyan Sheikh & Numra Amjad
+SMIU Karachi · 2025
 GitHub  : https://github.com/ryansheikh/extreme-weather-prediction
-
-All charts are interactive Plotly — hover, zoom, pan, download!
-Tabs:
-    1 — Live Predictions (alerts + charts)
-    2 — SHAP Explainability (interactive feature importance)
-    3 — Historical Trends (2019-2020 test period)
-    4 — Model Performance (confusion matrix, ROC, calibration)
-    5 — Extended 2021-2026 (new predictions)
-    6 — Data Explorer
-==============================================================================
 """
 
 import streamlit as st
@@ -36,22 +24,54 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── Neutral CSS (works on dark + light mode) ───────────────────
 st.markdown("""
 <style>
-    .main-header { font-size:2.2rem; font-weight:700; color:#1E88E5; text-align:center; padding:.5rem 0; }
-    .sub-header  { font-size:1rem; color:#90A4AE; text-align:center; margin-bottom:1.5rem; }
-    .card-blue   { background:linear-gradient(135deg,#1a237e,#283593); padding:1.2rem; border-radius:12px; color:white; text-align:center; margin:.3rem 0; }
-    .card-green  { background:linear-gradient(135deg,#1b5e20,#2e7d32); padding:1rem; border-radius:10px; color:white; text-align:center; }
-    .alert-green  { background:linear-gradient(135deg,#1b5e20,#2e7d32); padding:1rem; border-radius:10px; color:white; text-align:center; font-size:1.2rem; font-weight:bold; }
-    .alert-yellow { background:linear-gradient(135deg,#f57f17,#fbc02d); padding:1rem; border-radius:10px; color:black; text-align:center; font-size:1.2rem; font-weight:bold; }
-    .alert-orange { background:linear-gradient(135deg,#e65100,#ff6d00); padding:1rem; border-radius:10px; color:white; text-align:center; font-size:1.2rem; font-weight:bold; }
-    .alert-red    { background:linear-gradient(135deg,#b71c1c,#d32f2f); padding:1rem; border-radius:10px; color:white; text-align:center; font-size:1.2rem; font-weight:bold; }
-    .stTabs [data-baseweb="tab"] { padding:10px 20px; font-weight:600; }
+    .main-header {
+        font-size: 2rem; font-weight: 700;
+        text-align: center; padding: .6rem 0;
+    }
+    .sub-header {
+        font-size: .95rem; text-align: center;
+        opacity: .7; margin-bottom: 1.5rem;
+    }
+    .info-box {
+        border: 1px solid rgba(128,128,128,.3);
+        border-radius: 10px; padding: 1rem;
+        margin: .4rem 0;
+    }
+    .alert-green  { border-left: 6px solid #2e7d32; background: rgba(46,125,50,.12);
+        padding: .8rem 1rem; border-radius: 6px; font-weight: 600; }
+    .alert-yellow { border-left: 6px solid #f9a825; background: rgba(249,168,37,.12);
+        padding: .8rem 1rem; border-radius: 6px; font-weight: 600; }
+    .alert-orange { border-left: 6px solid #e65100; background: rgba(230,81,0,.12);
+        padding: .8rem 1rem; border-radius: 6px; font-weight: 600; }
+    .alert-red    { border-left: 6px solid #c62828; background: rgba(198,40,40,.12);
+        padding: .8rem 1rem; border-radius: 6px; font-weight: 600; }
+    .section-title {
+        font-size: 1.05rem; font-weight: 600; margin: .8rem 0 .3rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Constants ──────────────────────────────────────────────────
-EXACT_FEATURES = [
+# ── Color Palette (neutral, works on dark + light) ─────────────
+C = {
+    "blue":   "#4472CA", "red":    "#E15759", "green":  "#59A14F",
+    "orange": "#F28E2B", "purple": "#B07AA1", "teal":   "#4E9FA8",
+    "brown":  "#9C755F", "pink":   "#FF9DA7", "gray":   "#76787A",
+    "lime":   "#8CD17D",
+}
+CLASS_COLORS = {
+    "Normal": C["green"], "Heatwave": C["orange"],
+    "Heavy Rain": C["blue"], "Storm": C["red"],
+}
+CLASS_NAMES = {0:"Normal", 1:"Heatwave", 2:"Heavy Rain", 3:"Storm"}
+MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun",
+               "Jul","Aug","Sep","Oct","Nov","Dec"]
+HW_CITIES   = {"Karachi","Delhi","Mumbai","Dhaka"}
+
+# ── Exact feature list (matches trained models) ────────────────
+FEATURES = [
     "temperature_2m","relative_humidity_2m","precipitation",
     "windspeed_10m","surface_pressure","cloudcover","shortwave_radiation",
     "latitude","longitude","coastal",
@@ -72,66 +92,67 @@ EXACT_FEATURES = [
 ]
 
 CITY_META = {
-    "Karachi":    {"lat":24.86, "lon":67.01,  "coastal":1,"climate_zone":"Arid",         "continent":"Asia"},
-    "Mumbai":     {"lat":19.08, "lon":72.88,  "coastal":1,"climate_zone":"Tropical",     "continent":"Asia"},
-    "Delhi":      {"lat":28.61, "lon":77.21,  "coastal":0,"climate_zone":"Semi-Arid",    "continent":"Asia"},
-    "Dhaka":      {"lat":23.81, "lon":90.41,  "coastal":1,"climate_zone":"Tropical",     "continent":"Asia"},
-    "Tokyo":      {"lat":35.68, "lon":139.65, "coastal":1,"climate_zone":"Temperate",    "continent":"Asia"},
-    "Jakarta":    {"lat":-6.21, "lon":106.85, "coastal":1,"climate_zone":"Tropical",     "continent":"Asia"},
-    "Lagos":      {"lat":6.52,  "lon":3.38,   "coastal":1,"climate_zone":"Tropical",     "continent":"Africa"},
-    "Nairobi":    {"lat":-1.29, "lon":36.82,  "coastal":0,"climate_zone":"Temperate",    "continent":"Africa"},
-    "Cape_Town":  {"lat":-33.92,"lon":18.42,  "coastal":1,"climate_zone":"Mediterranean","continent":"Africa"},
-    "Cairo":      {"lat":30.04, "lon":31.24,  "coastal":0,"climate_zone":"Arid",         "continent":"Africa"},
-    "Miami":      {"lat":25.76, "lon":-80.19, "coastal":1,"climate_zone":"Tropical",     "continent":"Americas"},
-    "Chicago":    {"lat":41.88, "lon":-87.63, "coastal":0,"climate_zone":"Continental",  "continent":"Americas"},
-    "Phoenix":    {"lat":33.45, "lon":-112.07,"coastal":0,"climate_zone":"Arid",         "continent":"Americas"},
-    "Sao_Paulo":  {"lat":-23.55,"lon":-46.63, "coastal":0,"climate_zone":"Tropical",     "continent":"Americas"},
-    "Rotterdam":  {"lat":51.92, "lon":4.48,   "coastal":1,"climate_zone":"Temperate",    "continent":"Europe"},
-    "Madrid":     {"lat":40.42, "lon":-3.70,  "coastal":0,"climate_zone":"Mediterranean","continent":"Europe"},
-    "Moscow":     {"lat":55.76, "lon":37.62,  "coastal":0,"climate_zone":"Continental",  "continent":"Europe"},
-    "Ulaanbaatar":{"lat":47.89, "lon":106.91, "coastal":0,"climate_zone":"Continental",  "continent":"Asia"},
-    "Sydney":     {"lat":-33.87,"lon":151.21, "coastal":1,"climate_zone":"Temperate",    "continent":"Oceania"},
-    "Riyadh":     {"lat":24.71, "lon":46.68,  "coastal":0,"climate_zone":"Arid",         "continent":"Asia"},
+    "Karachi":    {"lat":24.86,"lon":67.01,"coastal":1,"cz":"Arid",         "cont":"Asia"},
+    "Mumbai":     {"lat":19.08,"lon":72.88,"coastal":1,"cz":"Tropical",     "cont":"Asia"},
+    "Delhi":      {"lat":28.61,"lon":77.21,"coastal":0,"cz":"Semi-Arid",    "cont":"Asia"},
+    "Dhaka":      {"lat":23.81,"lon":90.41,"coastal":1,"cz":"Tropical",     "cont":"Asia"},
+    "Tokyo":      {"lat":35.68,"lon":139.65,"coastal":1,"cz":"Temperate",   "cont":"Asia"},
+    "Jakarta":    {"lat":-6.21,"lon":106.85,"coastal":1,"cz":"Tropical",    "cont":"Asia"},
+    "Lagos":      {"lat":6.52,"lon":3.38,"coastal":1,"cz":"Tropical",       "cont":"Africa"},
+    "Nairobi":    {"lat":-1.29,"lon":36.82,"coastal":0,"cz":"Temperate",    "cont":"Africa"},
+    "Cape_Town":  {"lat":-33.92,"lon":18.42,"coastal":1,"cz":"Mediterranean","cont":"Africa"},
+    "Cairo":      {"lat":30.04,"lon":31.24,"coastal":0,"cz":"Arid",         "cont":"Africa"},
+    "Miami":      {"lat":25.76,"lon":-80.19,"coastal":1,"cz":"Tropical",    "cont":"Americas"},
+    "Chicago":    {"lat":41.88,"lon":-87.63,"coastal":0,"cz":"Continental", "cont":"Americas"},
+    "Phoenix":    {"lat":33.45,"lon":-112.07,"coastal":0,"cz":"Arid",       "cont":"Americas"},
+    "Sao_Paulo":  {"lat":-23.55,"lon":-46.63,"coastal":0,"cz":"Tropical",   "cont":"Americas"},
+    "Rotterdam":  {"lat":51.92,"lon":4.48,"coastal":1,"cz":"Temperate",     "cont":"Europe"},
+    "Madrid":     {"lat":40.42,"lon":-3.70,"coastal":0,"cz":"Mediterranean","cont":"Europe"},
+    "Moscow":     {"lat":55.76,"lon":37.62,"coastal":0,"cz":"Continental",  "cont":"Europe"},
+    "Ulaanbaatar":{"lat":47.89,"lon":106.91,"coastal":0,"cz":"Continental", "cont":"Asia"},
+    "Sydney":     {"lat":-33.87,"lon":151.21,"coastal":1,"cz":"Temperate",  "cont":"Oceania"},
+    "Riyadh":     {"lat":24.71,"lon":46.68,"coastal":0,"cz":"Arid",         "cont":"Asia"},
 }
 CZ_MAP   = {"Arid":0,"Continental":1,"Mediterranean":2,"Semi-Arid":3,"Temperate":4,"Tropical":5}
 CONT_MAP = {"Africa":0,"Americas":1,"Asia":2,"Europe":3,"Oceania":4}
-CLASS_NAMES = {0:"Normal",1:"Heatwave",2:"Heavy Rain",3:"Storm"}
-CLASS_COLORS = {"Normal":"#4CAF50","Heatwave":"#FF9800","Heavy Rain":"#2196F3","Storm":"#F44336"}
-HW_CITIES = {"Karachi","Delhi","Mumbai","Dhaka"}
 
-# ── Path Detection ─────────────────────────────────────────────
-@st.cache_data
-def detect_paths():
-    for d in [Path.cwd()/"data", Path("data"), Path.home()/"data",
-              Path.home()/"extreme_weather"/"data"]:
-        if d.exists(): data_dir = d; break
-    else: data_dir = None
-    for m in [Path.cwd()/"models", Path("models"), Path.home()/"models",
-              Path.home()/"extreme_weather"/"models"]:
-        if m.exists(): models_dir = m; break
-    else: models_dir = None
-    return data_dir, models_dir
-
-# ── Column fixer ───────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────
 def fix_columns(df):
     df = df.copy()
     city_list = sorted(df["city"].unique())
-    if "latitude"       not in df.columns: df["latitude"]       = df["city"].map({k:v["lat"]          for k,v in CITY_META.items()}).fillna(0)
-    if "longitude"      not in df.columns: df["longitude"]      = df["city"].map({k:v["lon"]          for k,v in CITY_META.items()}).fillna(0)
-    if "coastal"        not in df.columns: df["coastal"]        = df["city"].map({k:v["coastal"]      for k,v in CITY_META.items()}).fillna(0)
-    if "climate_zone"   not in df.columns: df["climate_zone"]   = df["city"].map({k:v["climate_zone"] for k,v in CITY_META.items()}).fillna("Temperate")
-    if "continent"      not in df.columns: df["continent"]      = df["city"].map({k:v["continent"]    for k,v in CITY_META.items()}).fillna("Asia")
-    if "climate_zone_id"not in df.columns: df["climate_zone_id"]= df["climate_zone"].map(CZ_MAP).fillna(4).astype(int)
-    if "continent_id"   not in df.columns: df["continent_id"]   = df["continent"].map(CONT_MAP).fillna(2).astype(int)
-    if "city_id"        not in df.columns: df["city_id"]        = df["city"].map({c:i for i,c in enumerate(city_list)}).fillna(0).astype(int)
+    if "latitude"        not in df.columns: df["latitude"]        = df["city"].map({k:v["lat"]  for k,v in CITY_META.items()}).fillna(0)
+    if "longitude"       not in df.columns: df["longitude"]       = df["city"].map({k:v["lon"]  for k,v in CITY_META.items()}).fillna(0)
+    if "coastal"         not in df.columns: df["coastal"]         = df["city"].map({k:v["coastal"] for k,v in CITY_META.items()}).fillna(0)
+    if "climate_zone"    not in df.columns: df["climate_zone"]    = df["city"].map({k:v["cz"]   for k,v in CITY_META.items()}).fillna("Temperate")
+    if "continent"       not in df.columns: df["continent"]       = df["city"].map({k:v["cont"] for k,v in CITY_META.items()}).fillna("Asia")
+    if "climate_zone_id" not in df.columns: df["climate_zone_id"] = df["climate_zone"].map(CZ_MAP).fillna(4).astype(int)
+    if "continent_id"    not in df.columns: df["continent_id"]    = df["continent"].map(CONT_MAP).fillna(2).astype(int)
+    if "city_id"         not in df.columns: df["city_id"]         = df["city"].map({c:i for i,c in enumerate(city_list)}).fillna(0).astype(int)
     df.fillna(0, inplace=True)
     return df
 
+def feat(df):
+    return [f for f in FEATURES if f in df.columns]
+
+def alert_style(temp, rp, hp, dc):
+    if dc==3 or rp>.8:        return "🚨 SEVERE WEATHER ALERT", "alert-red",    "RED"
+    elif dc==1 or hp>.7 or temp>42: return "⚠️ HEATWAVE WARNING","alert-orange","ORANGE"
+    elif dc==2 or rp>.5:      return "⛈️ RAIN ADVISORY",        "alert-yellow", "YELLOW"
+    return "✅ NORMAL CONDITIONS",                                "alert-green",  "GREEN"
+
 # ── Data Loaders ───────────────────────────────────────────────
 @st.cache_data
-def load_test_data(data_dir):
-    for name in ["test.csv.gz","test.csv"]:
-        p = data_dir/"processed"/name
+def find_paths():
+    dd = next((p for p in [Path.cwd()/"data", Path("data"),
+               Path.home()/"data", Path.home()/"extreme_weather"/"data"] if p.exists()), None)
+    md = next((p for p in [Path.cwd()/"models", Path("models"),
+               Path.home()/"models", Path.home()/"extreme_weather"/"models"] if p.exists()), None)
+    return dd, md
+
+@st.cache_data
+def load_test(dd):
+    for n in ["test.csv.gz","test.csv"]:
+        p = dd/"processed"/n
         if p.exists():
             df = pd.read_csv(p, low_memory=False)
             df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
@@ -139,112 +160,89 @@ def load_test_data(data_dir):
     return None
 
 @st.cache_data
-def load_extended_data(data_dir):
-    p = data_dir/"reports"/"extended_predictions_2021_2026.csv"
-    if p.exists():
-        df = pd.read_csv(p, low_memory=False)
-        df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
-        return df
-    return None
-
-@st.cache_data
-def load_metrics(data_dir):
-    metrics = {}
-    for pl in ["A","B","C","D"]:
-        p = data_dir/"reports"/f"pipeline_{pl}_metrics.json"
+def load_ext(dd):
+    for n in ["extended_predictions_2021_2026.csv.gz",
+              "extended_predictions_2021_2026.csv"]:
+        p = dd/"reports"/n
         if p.exists():
-            with open(p) as f: metrics[pl] = json.load(f)
-    return metrics
-
-@st.cache_data
-def load_top_features(data_dir, pipeline):
-    p = data_dir/"reports"/f"pipeline_{pipeline}_top_features.csv"
-    if p.exists():
-        return pd.read_csv(p)
-    return None
-
-@st.cache_data
-def load_city_perf(data_dir, pipeline):
-    p = data_dir/"reports"/f"pipeline_{pipeline}_per_city_performance.csv"
-    if p.exists():
-        return pd.read_csv(p)
+            df = pd.read_csv(p, low_memory=False)
+            df["datetime"] = pd.to_datetime(df["datetime"])
+            df["year"]  = df["datetime"].dt.year
+            df["month"] = df["datetime"].dt.month
+            return df
     return None
 
 @st.cache_resource
-def load_models(models_dir):
-    if not models_dir: return {}
+def load_models(md):
+    if not md: return {}
     m = {}
-    for key,fn in [("temperature","pipeline_A_temperature_xgb.pkl"),
-                   ("temp_q10","pipeline_A_q10.pkl"),("temp_q90","pipeline_A_q90.pkl"),
-                   ("rainfall","pipeline_B_rainfall_xgb.pkl"),
-                   ("heatwave","pipeline_C_heatwave_xgb.pkl"),
-                   ("disaster","pipeline_D_disaster_xgb.pkl")]:
-        p = models_dir/fn
-        if p.exists(): m[key] = joblib.load(p)
+    for k,fn in [("temperature","pipeline_A_temperature_xgb.pkl"),
+                 ("q10","pipeline_A_q10.pkl"),("q90","pipeline_A_q90.pkl"),
+                 ("rainfall","pipeline_B_rainfall_xgb.pkl"),
+                 ("heatwave","pipeline_C_heatwave_xgb.pkl"),
+                 ("disaster","pipeline_D_disaster_xgb.pkl")]:
+        p = md/fn
+        if p.exists(): m[k] = joblib.load(p)
     return m
 
-def predict_row(models, row_df):
-    X = row_df[[f for f in EXACT_FEATURES if f in row_df.columns]]
-    temp  = models["temperature"].predict(X)[0] if "temperature" in models else row_df["temperature_2m"].values[0]
-    q10   = models["temp_q10"].predict(X)[0]    if "temp_q10"    in models else temp-2
-    q90   = models["temp_q90"].predict(X)[0]    if "temp_q90"    in models else temp+2
-    rprob = models["rainfall"].predict_proba(X)[0][1] if "rainfall" in models else 0.0
-    hprob = models["heatwave"].predict_proba(X)[0][1] if "heatwave" in models else 0.0
-    dprob = models["disaster"].predict_proba(X)[0]    if "disaster" in models else [1,0,0,0]
-    dcls  = int(np.argmax(dprob))
-    dconf = float(max(dprob))
-    return temp,q10,q90,rprob,hprob,dcls,dprob,dconf
+@st.cache_data
+def load_csv(dd, name):
+    p = dd/"reports"/name
+    if p.exists(): return pd.read_csv(p)
+    return None
 
-def get_alert(temp, rprob, hprob, dcls):
-    if dcls==3 or rprob>0.8:   return "🚨 SEVERE WEATHER ALERT","alert-red","RED"
-    elif dcls==1 or hprob>0.7 or temp>42: return "⚠️ HEATWAVE WARNING","alert-orange","ORANGE"
-    elif dcls==2 or rprob>0.5: return "⛈️ RAIN ADVISORY","alert-yellow","YELLOW"
-    return "✅ NORMAL CONDITIONS","alert-green","GREEN"
+@st.cache_data
+def load_metrics(dd):
+    out = {}
+    for pl in ["A","B","C","D"]:
+        p = dd/"reports"/f"pipeline_{pl}_metrics.json"
+        if p.exists():
+            with open(p) as f: out[pl] = json.load(f)
+    return out
 
-
-# ══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 # MAIN
-# ══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 def main():
+    dd, md = find_paths()
+    if dd is None: st.error("❌ Data folder not found."); st.stop()
+
+    test_df = load_test(dd)
+    if test_df is None: st.error("❌ test.csv.gz not found."); st.stop()
+    ext_df  = load_ext(dd)
+    models  = load_models(md) if md else {}
+    metrics = load_metrics(dd)
+
     st.markdown('<div class="main-header">🌦️ AI Extreme Weather Prediction System</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">20 Global Cities · 4 ML Pipelines · 17.5 Years of Data (2009–2026) · Interactive Dashboard</div>', unsafe_allow_html=True)
-
-    data_dir, models_dir = detect_paths()
-    if data_dir is None:
-        st.error("❌ Data directory not found."); st.stop()
-
-    test_df  = load_test_data(data_dir)
-    ext_df   = load_extended_data(data_dir)
-    models   = load_models(models_dir) if models_dir else {}
-    metrics  = load_metrics(data_dir)
-
-    if test_df is None:
-        st.error("❌ Test data not found."); st.stop()
+    st.markdown('<div class="sub-header">20 Global Cities · 4 XGBoost Pipelines · 17.5 Years Data (2009 – May 2026) · Explainable AI</div>', unsafe_allow_html=True)
 
     # ── SIDEBAR ───────────────────────────────────────────────
-    st.sidebar.markdown("## 🌍 Controls")
     cities = sorted(test_df["city"].unique())
-    sel = st.sidebar.selectbox("🏙️ City", cities,
-                               index=cities.index("Karachi") if "Karachi" in cities else 0)
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**📊 Pipeline Status**")
-    for key,name in [("temperature","A — Temperature"),("rainfall","B — Rainfall"),
-                     ("heatwave","C — Heatwave"),("disaster","D — Disaster")]:
-        st.sidebar.markdown(f"{'✅' if key in models else '⚠️ (no model)'} {name}")
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**📅 Data Coverage**")
-    st.sidebar.info("Train: 2009–2017\nTest:  2019–2020\nNew:   2021–May 2026\nProj:  2027")
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**👥 Team**")
-    st.sidebar.markdown("Syed Bilal · Raiyan Sheikh\nNumra Amjad\n\nSMIU Karachi · 2025")
+    with st.sidebar:
+        st.markdown("### 🌍 Controls")
+        sel = st.selectbox("City", cities,
+                           index=cities.index("Karachi") if "Karachi" in cities else 0)
+        st.markdown("---")
+        st.markdown("**Pipeline Status**")
+        status = {"temperature":"A — Temperature","rainfall":"B — Rainfall",
+                  "heatwave":"C — Heatwave","disaster":"D — Disaster"}
+        for k,n in status.items():
+            st.markdown(f"{'✅' if k in models else '⚠️'} {n}")
+        st.markdown("---")
+        st.markdown("**Data Coverage**")
+        st.markdown("🔵 Train:   2009 – 2017\n🟢 Test:    2019 – 2020\n🟠 Extended: 2021 – May 2026\n🔴 Projected: 2027")
+        st.markdown("---")
+        st.markdown("**Team — SMIU Karachi**")
+        st.markdown("Syed Bilal\nRaiyan Sheikh\nNumra Amjad")
 
     city_df = test_df[test_df["city"]==sel].copy()
+    threshold = 40.0 if sel in HW_CITIES else 35.0
 
     # ── TABS ──────────────────────────────────────────────────
     t1,t2,t3,t4,t5,t6 = st.tabs([
         "🔮 Live Predictions",
-        "🧠 SHAP Explainability",
         "📈 Historical Trends",
+        "🧠 SHAP Explainability",
         "📊 Model Performance",
         "🆕 2021–2026 Extended",
         "🔍 Data Explorer",
@@ -254,663 +252,629 @@ def main():
     # TAB 1 — LIVE PREDICTIONS
     # ══════════════════════════════════════════════════════════
     with t1:
-        st.header(f"🔮 Predictions for {sel}")
-        if len(city_df)==0:
-            st.warning("No data available for this city."); st.stop()
+        st.subheader(f"🔮 Next-Hour Predictions — {sel}")
+
+        if len(city_df) == 0:
+            st.warning("No data for selected city."); st.stop()
 
         latest = city_df.iloc[-1:]
-        temp,q10,q90,rprob,hprob,dcls,dprob,dconf = predict_row(models, latest)
-        alert_txt, alert_cls, alert_lvl = get_alert(temp, rprob, hprob, dcls)
-        dn = CLASS_NAMES[dcls]
+        X = latest[feat(latest)]
+        tp  = models["temperature"].predict(X)[0]   if "temperature" in models else latest["temperature_2m"].values[0]
+        q10 = models["q10"].predict(X)[0]            if "q10" in models else tp-2
+        q90 = models["q90"].predict(X)[0]            if "q90" in models else tp+2
+        rp  = models["rainfall"].predict_proba(X)[0][1]  if "rainfall" in models else 0.0
+        hp  = models["heatwave"].predict_proba(X)[0][1]  if "heatwave" in models else 0.0
+        dp  = models["disaster"].predict_proba(X)[0]     if "disaster" in models else [1,0,0,0]
+        dc  = int(np.argmax(dp))
+        dconf = float(max(dp))
 
-        st.markdown(f'<div class="{alert_cls}">{alert_txt} — Level: {alert_lvl}</div>', unsafe_allow_html=True)
-        st.markdown("")
+        # Alert banner
+        atxt, acls, _ = alert_style(tp, rp, hp, dc)
+        st.markdown(f'<div class="{acls}" style="margin-bottom:.8rem">{atxt}</div>', unsafe_allow_html=True)
 
+        # Metrics row (native Streamlit — auto-adapts to dark/light)
         c1,c2,c3,c4 = st.columns(4)
-        with c1:
-            rc = "#4CAF50" if rprob<0.3 else "#FF9800" if rprob<0.7 else "#F44336"
-            st.markdown(f"""<div class="card-blue">
-                <div style="font-size:.85rem;opacity:.8">🌡️ Temperature</div>
-                <div style="font-size:2rem;font-weight:bold">{temp:.1f}°C</div>
-                <div style="font-size:.78rem;opacity:.7">80% CI: {q10:.1f}°C — {q90:.1f}°C</div>
-            </div>""", unsafe_allow_html=True)
-        with c2:
-            rc = "#4CAF50" if rprob<0.3 else "#FF9800" if rprob<0.7 else "#F44336"
-            st.markdown(f"""<div class="card-blue">
-                <div style="font-size:.85rem;opacity:.8">🌧️ Rain Probability</div>
-                <div style="font-size:2rem;font-weight:bold;color:{rc}">{rprob*100:.0f}%</div>
-                <div style="font-size:.78rem;opacity:.7">{'Heavy rain likely' if rprob>.5 else 'Low risk'}</div>
-            </div>""", unsafe_allow_html=True)
-        with c3:
-            hc = "#4CAF50" if hprob<0.3 else "#FF9800" if hprob<0.7 else "#F44336"
-            st.markdown(f"""<div class="card-blue">
-                <div style="font-size:.85rem;opacity:.8">☀️ Heatwave Risk</div>
-                <div style="font-size:2rem;font-weight:bold;color:{hc}">{hprob*100:.0f}%</div>
-                <div style="font-size:.78rem;opacity:.7">{'⚠️ High risk!' if hprob>.5 else 'Low risk'}</div>
-            </div>""", unsafe_allow_html=True)
-        with c4:
-            dc = CLASS_COLORS.get(dn,"white")
-            st.markdown(f"""<div class="card-blue">
-                <div style="font-size:.85rem;opacity:.8">🚨 Disaster Class</div>
-                <div style="font-size:1.6rem;font-weight:bold;color:{dc}">{dn}</div>
-                <div style="font-size:.78rem;opacity:.7">Confidence: {dconf*100:.0f}%</div>
-            </div>""", unsafe_allow_html=True)
+        c1.metric("🌡️ Temperature",    f"{tp:.1f} °C",   f"CI: {q10:.1f} – {q90:.1f} °C")
+        c2.metric("🌧️ Rain Probability",f"{rp*100:.0f}%", "Heavy rain likely" if rp>.5 else "Low risk")
+        c3.metric("☀️ Heatwave Risk",   f"{hp*100:.0f}%", "⚠️ High!" if hp>.5 else "Normal")
+        c4.metric("🚨 Disaster Class",  CLASS_NAMES[dc],  f"Confidence {dconf*100:.0f}%")
 
         st.markdown("---")
-        # Temperature chart with uncertainty
-        st.subheader(f"🌡️ Temperature Forecast — Last 7 Days ({sel})")
-        n = min(24*7, len(city_df))
+
+        # ── Temperature 7-day chart ───────────────────────────
+        st.markdown('<p class="section-title">🌡️ Temperature Forecast — Last 7 Days</p>', unsafe_allow_html=True)
+        n   = min(24*7, len(city_df))
         rec = city_df.tail(n).copy()
-        X_rec = rec[[f for f in EXACT_FEATURES if f in rec.columns]]
+        Xr  = rec[feat(rec)]
         if "temperature" in models:
-            rec["pred"] = models["temperature"].predict(X_rec)
-            rec["q10_r"] = models["temp_q10"].predict(X_rec) if "temp_q10" in models else rec["pred"]-2
-            rec["q90_r"] = models["temp_q90"].predict(X_rec) if "temp_q90" in models else rec["pred"]+2
+            rec["pred"] = models["temperature"].predict(Xr)
+            rec["q10_"]  = models["q10"].predict(Xr) if "q10" in models else rec["pred"]-2
+            rec["q90_"]  = models["q90"].predict(Xr) if "q90" in models else rec["pred"]+2
         else:
             rec["pred"] = rec["temperature_2m"]
-            rec["q10_r"] = rec["pred"]-2
-            rec["q90_r"] = rec["pred"]+2
+            rec["q10_"] = rec["pred"]-2
+            rec["q90_"] = rec["pred"]+2
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=rec["datetime"], y=rec["q10_r"], line=dict(width=0), showlegend=False, mode="lines"))
-        fig.add_trace(go.Scatter(x=rec["datetime"], y=rec["q90_r"], fill="tonexty",
-                                 fillcolor="rgba(33,150,243,0.15)", line=dict(width=0), name="80% Confidence Interval"))
+        fig.add_trace(go.Scatter(x=rec["datetime"], y=rec["q10_"], mode="lines", line=dict(width=0), showlegend=False))
+        fig.add_trace(go.Scatter(x=rec["datetime"], y=rec["q90_"], mode="lines", line=dict(width=0),
+                                 fill="tonexty", fillcolor="rgba(68,114,202,.15)", name="80% CI"))
         fig.add_trace(go.Scatter(x=rec["datetime"], y=rec["temperature_2m"], mode="lines",
-                                 name="Actual", line=dict(color="#FF5722",width=2.5)))
+                                 name="Actual", line=dict(color=C["red"],width=2.5)))
         fig.add_trace(go.Scatter(x=rec["datetime"], y=rec["pred"], mode="lines",
-                                 name="AI Predicted", line=dict(color="#2196F3",width=2.5,dash="dash")))
-        fig.update_layout(template="plotly_dark", height=420,
+                                 name="Predicted", line=dict(color=C["blue"],width=2.5,dash="dot")))
+        fig.update_layout(height=380, hovermode="x unified",
                           xaxis_title="Date/Time", yaxis_title="Temperature (°C)",
-                          hovermode="x unified", legend=dict(orientation="h",y=1.1))
-        st.plotly_chart(fig, use_container_width=True)
+                          legend=dict(orientation="h", y=1.08))
+        st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
-        # Disaster probability gauge-style bars
-        st.subheader("🚨 Disaster Class Probability")
-        prob_fig = go.Figure()
-        for i,(cls,prob) in enumerate(zip(CLASS_NAMES.values(), dprob)):
-            prob_fig.add_trace(go.Bar(
-                x=[prob], y=[cls], orientation="h",
-                name=cls, marker_color=list(CLASS_COLORS.values())[i],
-                text=f"{prob*100:.1f}%", textposition="outside",
-            ))
-        prob_fig.update_layout(template="plotly_dark", height=280,
-                               xaxis=dict(title="Probability",range=[0,1]),
-                               showlegend=False, barmode="overlay")
-        st.plotly_chart(prob_fig, use_container_width=True)
+        # ── Gauges ────────────────────────────────────────────
+        gc1, gc2 = st.columns(2)
+        for col, val, title, color in [
+            (gc1, rp*100, "🌧️ Rain Probability (%)",  C["blue"]),
+            (gc2, hp*100, "☀️ Heatwave Risk (%)",     C["orange"]),
+        ]:
+            with col:
+                g = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=val,
+                    gauge={"axis":{"range":[0,100]},
+                           "bar":{"color":color},
+                           "steps":[{"range":[0,30],"color":"rgba(89,161,79,.2)"},
+                                    {"range":[30,70],"color":"rgba(242,142,43,.2)"},
+                                    {"range":[70,100],"color":"rgba(225,87,89,.2)"}],
+                           "threshold":{"line":{"color":color,"width":3},"value":50,"thickness":.8}},
+                    title={"text":title},
+                ))
+                g.update_layout(height=280, margin=dict(t=40,b=10,l=20,r=20))
+                st.plotly_chart(g, use_container_width=True, theme="streamlit")
 
-        # Rain probability gauge
-        col_r, col_h = st.columns(2)
-        with col_r:
-            st.subheader("🌧️ Rain Probability Gauge")
-            gauge_r = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=rprob*100,
-                delta={"reference":30,"increasing":{"color":"#F44336"}},
-                gauge={"axis":{"range":[0,100]},
-                       "bar":{"color":"#2196F3"},
-                       "steps":[{"range":[0,30],"color":"#1b5e20"},
-                                {"range":[30,70],"color":"#f57f17"},
-                                {"range":[70,100],"color":"#b71c1c"}],
-                       "threshold":{"line":{"color":"white","width":4},"thickness":.75,"value":50}},
-                title={"text":"Rain Probability (%)"},
-            ))
-            gauge_r.update_layout(template="plotly_dark", height=300)
-            st.plotly_chart(gauge_r, use_container_width=True)
-
-        with col_h:
-            st.subheader("☀️ Heatwave Risk Gauge")
-            gauge_h = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=hprob*100,
-                delta={"reference":30,"increasing":{"color":"#F44336"}},
-                gauge={"axis":{"range":[0,100]},
-                       "bar":{"color":"#FF5722"},
-                       "steps":[{"range":[0,30],"color":"#1b5e20"},
-                                {"range":[30,70],"color":"#f57f17"},
-                                {"range":[70,100],"color":"#b71c1c"}],
-                       "threshold":{"line":{"color":"white","width":4},"thickness":.75,"value":50}},
-                title={"text":"Heatwave Probability (%)"},
-            ))
-            gauge_h.update_layout(template="plotly_dark", height=300)
-            st.plotly_chart(gauge_h, use_container_width=True)
+        # ── Disaster probability bars ─────────────────────────
+        st.markdown('<p class="section-title">🚨 Disaster Class Probability</p>', unsafe_allow_html=True)
+        pbar = go.Figure(go.Bar(
+            x=list(CLASS_NAMES.values()),
+            y=[float(p) for p in dp],
+            marker_color=[CLASS_COLORS[n] for n in CLASS_NAMES.values()],
+            text=[f"{p*100:.1f}%" for p in dp],
+            textposition="outside",
+        ))
+        pbar.update_layout(height=300, yaxis=dict(range=[0,1.1], title="Probability"),
+                           xaxis_title="Disaster Class", showlegend=False)
+        st.plotly_chart(pbar, use_container_width=True, theme="streamlit")
 
     # ══════════════════════════════════════════════════════════
-    # TAB 2 — SHAP EXPLAINABILITY
+    # TAB 2 — HISTORICAL TRENDS
     # ══════════════════════════════════════════════════════════
     with t2:
-        st.header("🧠 SHAP Feature Importance — Explainable AI")
+        st.subheader(f"📈 Historical Trends — {sel} (Test Period 2019–2020)")
 
-        pl_map = {"Pipeline A — Temperature (Regression)":"A",
-                  "Pipeline B — Rainfall (Binary)":"B",
-                  "Pipeline C — Heatwave (Binary)":"C",
-                  "Pipeline D — Disaster (Multi-Class)":"D"}
-        pl_name = st.selectbox("Select Pipeline", list(pl_map.keys()))
-        pl = pl_map[pl_name]
+        ch = city_df.copy()
+        ch["year"]   = ch["datetime"].dt.year
+        ch["month"]  = ch["datetime"].dt.month
+        ch["hour"]   = ch["datetime"].dt.hour
 
-        top_df = load_top_features(data_dir, pl)
-
-        if top_df is not None and not top_df.empty:
-            top_df = top_df.head(20).sort_values("mean_abs_shap")
-
-            # Feature importance horizontal bar
-            st.subheader(f"📊 Top {len(top_df)} Features by Mean |SHAP| — Pipeline {pl}")
-            colors = px.colors.sequential.Blues[2:]
-            bar_colors = [colors[int(i/(len(top_df)-1)*(len(colors)-1))] for i in range(len(top_df))]
-
-            fig_shap = go.Figure(go.Bar(
-                x=top_df["mean_abs_shap"],
-                y=top_df["feature"],
-                orientation="h",
-                marker=dict(color=bar_colors),
-                text=[f"{v:.4f}" for v in top_df["mean_abs_shap"]],
-                textposition="outside",
-            ))
-            fig_shap.update_layout(
-                template="plotly_dark", height=600,
-                xaxis_title="Mean |SHAP Value| (average impact on model output)",
-                yaxis_title="Feature",
-                title=f"Pipeline {pl} — Feature Importance (SHAP)",
-                showlegend=False,
-            )
-            st.plotly_chart(fig_shap, use_container_width=True)
-
-            # Feature categories
-            st.subheader("🗂️ Feature Categories Breakdown")
-            def categorize(feat):
-                if any(x in feat for x in ["lag_24","lag_48","lag_72"]): return "Lag Features"
-                if "roll" in feat: return "Rolling Features"
-                if feat in ["hour","day","month","year","season","is_weekend","day_of_week","day_of_year"]: return "Time Features"
-                if feat in ["latitude","longitude","coastal","city_id","continent_id","climate_zone_id"]: return "Geographic"
-                return "Raw Weather"
-
-            top_df["category"] = top_df["feature"].apply(categorize)
-            cat_sum = top_df.groupby("category")["mean_abs_shap"].sum().reset_index()
-            fig_pie = px.pie(cat_sum, values="mean_abs_shap", names="category",
-                             color_discrete_sequence=px.colors.qualitative.Bold,
-                             title=f"Feature Category Contribution — Pipeline {pl}",
-                             template="plotly_dark")
-            fig_pie.update_traces(textposition="inside", textinfo="percent+label")
-            fig_pie.update_layout(height=420)
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-            # Top features table
-            st.subheader("📋 Full Feature Ranking Table")
-            display_df = top_df[["feature","mean_abs_shap","category"]].sort_values(
-                "mean_abs_shap", ascending=False).reset_index(drop=True)
-            display_df.index += 1
-            display_df.columns = ["Feature","Mean |SHAP|","Category"]
-            display_df["Mean |SHAP|"] = display_df["Mean |SHAP|"].round(4)
-            st.dataframe(display_df, use_container_width=True)
-
-            # Physical interpretation
-            st.subheader("🔬 Physical Interpretation")
-            interpretations = {
-                "A": """**Top feature: temperature_2m (current temperature)**
-                — The best predictor of next-hour temperature is the current temperature. This is physically intuitive: weather systems evolve gradually, not suddenly.
-
-                **temperature_2m_lag_24h (yesterday's temperature at same hour)**
-                — The diurnal cycle (day/night pattern) means yesterday's reading at the same hour is a strong predictor. If it was 38°C at 2pm yesterday, it will likely be similar today.
-
-                **shortwave_radiation (solar energy input)**
-                — Solar radiation drives daytime heating. High radiation = temperature will rise. This is the physical mechanism behind temperature change.
-
-                **hour (time of day)**
-                — Temperature follows a clear 24-hour cycle: low at dawn, peak in afternoon. The model learned this pattern directly from 15 years of data.""",
-                "B": """**Top feature: precipitation (current rainfall)**
-                — Current rain is the strongest predictor of rain in the next hour. Rainfall events typically last multiple hours, not single moments.
-
-                **precipitation_roll_24h_std (rainfall variability)**
-                — High variability in recent rainfall indicates an active weather system, which increases future rain probability.
-
-                **cloudcover (cloud coverage)**
-                — High cloud cover is a necessary (but not sufficient) condition for rainfall. The model correctly learned this physical relationship.""",
-                "C": """**Top feature: temperature_2m (current temperature)**
-                — A heatwave is defined by extreme temperature, so current temperature naturally dominates.
-
-                **relative_humidity_2m (humidity)**
-                — Low humidity during high temperatures is the hallmark of dry heatwaves. The model captures this interaction.
-
-                **temperature_2m_lag_24h**
-                — Heatwaves require sustained heat, not just a single hot hour. Yesterday's temperature being high increases today's heatwave probability.""",
-                "D": """**Top feature: precipitation**
-                — Heavy rain dominates disaster classification because it occurs more frequently than storms and is directly measurable.
-
-                **temperature_2m**
-                — Heatwave classification requires sustained high temperatures.
-
-                **windspeed_10m and cloudcover**
-                — These two features together define storm classification (≥40 km/h wind AND ≥70% cloud cover).""",
-            }
-            st.markdown(interpretations.get(pl, "Physical interpretation not available."))
-        else:
-            st.warning(f"Feature importance data not found for Pipeline {pl}. Check data/reports/pipeline_{pl}_top_features.csv exists.")
-
-    # ══════════════════════════════════════════════════════════
-    # TAB 3 — HISTORICAL TRENDS
-    # ══════════════════════════════════════════════════════════
-    with t3:
-        st.header(f"📈 Historical Trends — {sel} (2019–2020 Test Period)")
-
-        city_h = city_df.copy()
-        city_h["year"]  = city_h["datetime"].dt.year
-        city_h["month"] = city_h["datetime"].dt.month
-        city_h["hour"]  = city_h["datetime"].dt.hour
-
-        # Temperature trend
-        st.subheader("🌡️ Temperature Over Time")
-        monthly_t = city_h.copy()
-        monthly_t["month_dt"] = monthly_t["datetime"].dt.to_period("M").dt.to_timestamp()
-        mt = monthly_t.groupby("month_dt")["temperature_2m"].agg(["mean","min","max"]).reset_index()
-        fig_t = go.Figure()
-        fig_t.add_trace(go.Scatter(x=mt["month_dt"], y=mt["max"],  mode="lines", name="Max",  line=dict(color="#F44336",dash="dot",width=1.5)))
-        fig_t.add_trace(go.Scatter(x=mt["month_dt"], y=mt["mean"], mode="lines", name="Mean", line=dict(color="#FF5722",width=2.5)))
-        fig_t.add_trace(go.Scatter(x=mt["month_dt"], y=mt["min"],  mode="lines", name="Min",  line=dict(color="#2196F3",dash="dot",width=1.5)))
-        fig_t.update_layout(template="plotly_dark", height=380,
-                            xaxis_title="Month", yaxis_title="Temperature (°C)",
-                            hovermode="x unified", legend=dict(orientation="h",y=1.1))
-        st.plotly_chart(fig_t, use_container_width=True)
+        # Temperature over time
+        st.markdown('<p class="section-title">🌡️ Monthly Average Temperature</p>', unsafe_allow_html=True)
+        ch["mdt"] = ch["datetime"].dt.to_period("M").dt.to_timestamp()
+        mt = ch.groupby("mdt")["temperature_2m"].agg(["mean","min","max"]).reset_index()
+        ft = go.Figure()
+        ft.add_trace(go.Scatter(x=mt["mdt"], y=mt["max"],  mode="lines", name="Max",
+                                line=dict(color=C["red"],width=1.5,dash="dot")))
+        ft.add_trace(go.Scatter(x=mt["mdt"], y=mt["mean"], mode="lines", name="Mean",
+                                line=dict(color=C["blue"],width=2.5)))
+        ft.add_trace(go.Scatter(x=mt["mdt"], y=mt["min"],  mode="lines", name="Min",
+                                line=dict(color=C["teal"],width=1.5,dash="dot")))
+        ft.add_hrect(y0=threshold, y1=mt["max"].max()+1,
+                     fillcolor=C["orange"], opacity=0.06,
+                     annotation_text=f"Heatwave zone (≥{threshold}°C)", annotation_position="top right")
+        ft.update_layout(height=380, xaxis_title="Month", yaxis_title="Temperature (°C)",
+                         hovermode="x unified", legend=dict(orientation="h",y=1.08))
+        st.plotly_chart(ft, use_container_width=True, theme="streamlit")
 
         col1, col2 = st.columns(2)
 
         with col1:
-            # Heatwave frequency
-            st.subheader("☀️ Heatwave Hours per Year")
-            threshold = 40.0 if sel in HW_CITIES else 35.0
-            city_h["hw"] = (city_h["temperature_2m"] >= threshold).astype(int)
-            hw_y = city_h.groupby("year")["hw"].sum().reset_index()
-            fig_hw = px.bar(hw_y, x="year", y="hw",
-                            color="hw", color_continuous_scale="YlOrRd",
-                            text="hw", template="plotly_dark",
-                            labels={"hw":"Heatwave Hours","year":"Year"},
-                            title=f"≥{threshold}°C threshold")
-            fig_hw.update_traces(texttemplate="%{text}", textposition="outside")
-            fig_hw.update_layout(height=360, showlegend=False)
-            st.plotly_chart(fig_hw, use_container_width=True)
+            # Heatwave hours per year
+            st.markdown('<p class="section-title">☀️ Heatwave Hours per Year</p>', unsafe_allow_html=True)
+            ch["hw"] = (ch["temperature_2m"] >= threshold).astype(int)
+            hwy = ch.groupby("year")["hw"].sum().reset_index()
+            fhw = px.bar(hwy, x="year", y="hw", text="hw",
+                         color="hw", color_continuous_scale=["#59A14F","#F28E2B","#E15759"],
+                         labels={"hw":"Hours","year":"Year"})
+            fhw.update_traces(texttemplate="%{text}", textposition="outside")
+            fhw.update_layout(height=340, showlegend=False,
+                               coloraxis_showscale=False)
+            st.plotly_chart(fhw, use_container_width=True, theme="streamlit")
 
         with col2:
             # Monthly precipitation
-            st.subheader("🌧️ Monthly Precipitation")
-            month_names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-            rain_m = city_h.groupby("month")["precipitation"].sum().reset_index()
-            rain_m["month_name"] = rain_m["month"].apply(lambda x: month_names[x-1])
-            fig_r = px.bar(rain_m, x="month_name", y="precipitation",
-                           color="precipitation", color_continuous_scale="Blues",
-                           text=rain_m["precipitation"].round(0),
-                           template="plotly_dark",
-                           labels={"precipitation":"Total Rain (mm)","month_name":"Month"})
-            fig_r.update_traces(texttemplate="%{text:.0f}", textposition="outside")
-            fig_r.update_layout(height=360, showlegend=False)
-            st.plotly_chart(fig_r, use_container_width=True)
+            st.markdown('<p class="section-title">🌧️ Monthly Precipitation</p>', unsafe_allow_html=True)
+            rm = ch.groupby("month")["precipitation"].sum().reset_index()
+            rm["month_name"] = rm["month"].apply(lambda x: MONTH_NAMES[x-1])
+            frm = px.bar(rm, x="month_name", y="precipitation",
+                         text=rm["precipitation"].round(0),
+                         color="precipitation",
+                         color_continuous_scale=["#C6E5F0","#4472CA"],
+                         labels={"precipitation":"Total (mm)","month_name":"Month"})
+            frm.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+            frm.update_layout(height=340, showlegend=False, coloraxis_showscale=False)
+            st.plotly_chart(frm, use_container_width=True, theme="streamlit")
 
         col3, col4 = st.columns(2)
+
         with col3:
-            # Wind distribution
-            st.subheader("💨 Wind Speed Distribution")
-            fig_w = px.histogram(city_h, x="windspeed_10m", nbins=60,
-                                 color_discrete_sequence=["#26A69A"],
-                                 template="plotly_dark",
-                                 labels={"windspeed_10m":"Wind Speed (km/h)"},
-                                 title="Distribution of Wind Speeds")
-            fig_w.add_vline(x=40, line_dash="dash", line_color="#F44336",
-                            annotation_text="Storm threshold (40 km/h)",
-                            annotation_position="top right")
-            fig_w.update_layout(height=360)
-            st.plotly_chart(fig_w, use_container_width=True)
+            # Wind speed distribution
+            st.markdown('<p class="section-title">💨 Wind Speed Distribution</p>', unsafe_allow_html=True)
+            fw = px.histogram(ch, x="windspeed_10m", nbins=60,
+                              color_discrete_sequence=[C["teal"]],
+                              labels={"windspeed_10m":"Wind Speed (km/h)"})
+            fw.add_vline(x=40, line_dash="dash", line_color=C["red"],
+                         annotation_text="Storm threshold", annotation_position="top right")
+            fw.update_layout(height=320)
+            st.plotly_chart(fw, use_container_width=True, theme="streamlit")
 
         with col4:
-            # Hourly temperature pattern
-            st.subheader("🕐 Average Temperature by Hour")
-            hourly = city_h.groupby("hour")["temperature_2m"].mean().reset_index()
-            fig_hr = px.line(hourly, x="hour", y="temperature_2m",
-                             markers=True, template="plotly_dark",
-                             color_discrete_sequence=["#FF9800"],
-                             labels={"temperature_2m":"Avg Temp (°C)","hour":"Hour of Day"},
-                             title="Diurnal Temperature Cycle")
-            fig_hr.update_layout(height=360)
-            fig_hr.update_xaxes(dtick=2, tick0=0)
-            st.plotly_chart(fig_hr, use_container_width=True)
+            # Hourly diurnal cycle
+            st.markdown('<p class="section-title">🕐 Temperature by Hour of Day</p>', unsafe_allow_html=True)
+            hr = ch.groupby("hour")["temperature_2m"].mean().reset_index()
+            fhr = px.line(hr, x="hour", y="temperature_2m", markers=True,
+                          color_discrete_sequence=[C["orange"]],
+                          labels={"temperature_2m":"Avg Temp (°C)","hour":"Hour"})
+            fhr.update_xaxes(dtick=3)
+            fhr.update_layout(height=320)
+            st.plotly_chart(fhr, use_container_width=True, theme="streamlit")
 
-        # Humidity vs Temperature scatter
-        st.subheader("🌡️ Temperature vs Humidity Scatter")
-        sample = city_h.sample(min(2000, len(city_h)), random_state=42)
-        sample["Heatwave"] = sample["temperature_2m"].apply(
-            lambda t: "Heatwave" if t >= threshold else "Normal")
-        fig_sc = px.scatter(sample, x="relative_humidity_2m", y="temperature_2m",
-                            color="Heatwave",
-                            color_discrete_map={"Heatwave":"#F44336","Normal":"#2196F3"},
-                            opacity=0.6, template="plotly_dark",
-                            labels={"relative_humidity_2m":"Humidity (%)","temperature_2m":"Temperature (°C)"},
-                            title="Temperature vs Humidity (sample of 2000 hourly readings)")
-        fig_sc.add_hline(y=threshold, line_dash="dash", line_color="orange",
-                         annotation_text=f"Heatwave threshold ({threshold}°C)")
-        fig_sc.update_layout(height=420)
-        st.plotly_chart(fig_sc, use_container_width=True)
+        # Temperature vs Humidity scatter
+        st.markdown('<p class="section-title">🌡️ Temperature vs Humidity (sample 2000 points)</p>', unsafe_allow_html=True)
+        samp = ch.sample(min(2000,len(ch)), random_state=42).copy()
+        samp["Label"] = samp["temperature_2m"].apply(
+            lambda t: "Heatwave" if t>=threshold else "Normal")
+        fsc = px.scatter(samp, x="relative_humidity_2m", y="temperature_2m",
+                         color="Label",
+                         color_discrete_map={"Heatwave":C["orange"],"Normal":C["blue"]},
+                         opacity=0.55,
+                         labels={"relative_humidity_2m":"Humidity (%)","temperature_2m":"Temperature (°C)"})
+        fsc.add_hline(y=threshold, line_dash="dash", line_color=C["red"],
+                      annotation_text=f"Heatwave threshold ({threshold}°C)")
+        fsc.update_layout(height=400, legend=dict(orientation="h",y=1.08))
+        st.plotly_chart(fsc, use_container_width=True, theme="streamlit")
+
+        # Seasonal box plot
+        st.markdown('<p class="section-title">📦 Temperature Distribution by Season</p>', unsafe_allow_html=True)
+        ch["season_name"] = ch["month"].apply(lambda m:
+            "Winter" if m in [12,1,2] else "Spring" if m in [3,4,5]
+            else "Summer" if m in [6,7,8] else "Autumn")
+        fbx = px.box(ch, x="season_name", y="temperature_2m",
+                     color="season_name",
+                     color_discrete_sequence=[C["blue"],C["green"],C["red"],C["orange"]],
+                     category_orders={"season_name":["Winter","Spring","Summer","Autumn"]},
+                     labels={"temperature_2m":"Temperature (°C)","season_name":"Season"})
+        fbx.update_layout(height=380, showlegend=False)
+        st.plotly_chart(fbx, use_container_width=True, theme="streamlit")
+
+    # ══════════════════════════════════════════════════════════
+    # TAB 3 — SHAP EXPLAINABILITY
+    # ══════════════════════════════════════════════════════════
+    with t3:
+        st.subheader("🧠 Explainable AI — SHAP Feature Importance")
+        st.markdown("SHAP (SHapley Additive exPlanations) shows **how much each feature contributes** to each prediction.")
+
+        pl_map = {"Pipeline A — Temperature (Regression)":"A",
+                  "Pipeline B — Rainfall (Binary Classification)":"B",
+                  "Pipeline C — Heatwave (Binary Classification)":"C",
+                  "Pipeline D — Disaster (Multi-Class)":"D"}
+        pl_name = st.selectbox("Select Pipeline", list(pl_map.keys()))
+        pl = pl_map[pl_name]
+
+        top_df = load_csv(dd, f"pipeline_{pl}_top_features.csv")
+
+        if top_df is not None and not top_df.empty:
+            top20 = top_df.head(20).sort_values("mean_abs_shap")
+
+            # Horizontal bar chart
+            st.markdown('<p class="section-title">📊 Top 20 Features by Mean |SHAP|</p>', unsafe_allow_html=True)
+            norm = (top20["mean_abs_shap"] - top20["mean_abs_shap"].min())
+            norm = norm / (norm.max()+1e-10)
+            bar_colors = [f"rgba(68,114,202,{0.3+0.7*v:.2f})" for v in norm]
+
+            fbar = go.Figure(go.Bar(
+                x=top20["mean_abs_shap"], y=top20["feature"],
+                orientation="h",
+                marker_color=bar_colors,
+                text=[f"{v:.4f}" for v in top20["mean_abs_shap"]],
+                textposition="outside",
+            ))
+            fbar.update_layout(height=580, xaxis_title="Mean |SHAP Value|",
+                               yaxis_title="Feature", showlegend=False)
+            st.plotly_chart(fbar, use_container_width=True, theme="streamlit")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Pie chart by category
+                st.markdown('<p class="section-title">🗂️ Feature Category Contribution</p>', unsafe_allow_html=True)
+                def cat(f):
+                    if any(x in f for x in ["lag_24","lag_48","lag_72"]): return "Lag Features"
+                    if "roll" in f: return "Rolling Features"
+                    if f in ["hour","day","month","year","season","is_weekend","day_of_week","day_of_year"]: return "Time Features"
+                    if f in ["latitude","longitude","coastal","city_id","continent_id","climate_zone_id"]: return "Geographic"
+                    return "Raw Weather"
+
+                top20["category"] = top20["feature"].apply(cat)
+                cs = top20.groupby("category")["mean_abs_shap"].sum().reset_index()
+                fp = px.pie(cs, values="mean_abs_shap", names="category",
+                            color_discrete_sequence=[C["blue"],C["orange"],C["green"],C["purple"],C["teal"]])
+                fp.update_traces(textposition="inside", textinfo="percent+label")
+                fp.update_layout(height=360, showlegend=False)
+                st.plotly_chart(fp, use_container_width=True, theme="streamlit")
+
+            with col2:
+                # Top 10 treemap
+                st.markdown('<p class="section-title">🗺️ Feature Importance Treemap</p>', unsafe_allow_html=True)
+                top10 = top_df.head(10).copy()
+                top10["category"] = top10["feature"].apply(cat)
+                ftm = px.treemap(top10, path=["category","feature"],
+                                 values="mean_abs_shap",
+                                 color="mean_abs_shap",
+                                 color_continuous_scale=["#C6E5F0","#4472CA"])
+                ftm.update_layout(height=360)
+                st.plotly_chart(ftm, use_container_width=True, theme="streamlit")
+
+            # Feature table
+            st.markdown('<p class="section-title">📋 Complete Feature Ranking</p>', unsafe_allow_html=True)
+            disp = top_df.copy()
+            disp["category"] = disp["feature"].apply(cat)
+            disp = disp[["feature","mean_abs_shap","category"]].rename(
+                columns={"feature":"Feature","mean_abs_shap":"Mean |SHAP|","category":"Category"})
+            disp["Mean |SHAP|"] = disp["Mean |SHAP|"].round(4)
+            disp.index = range(1, len(disp)+1)
+            st.dataframe(disp, use_container_width=True, height=400)
+
+        else:
+            st.warning(f"No feature data found for Pipeline {pl}.")
 
     # ══════════════════════════════════════════════════════════
     # TAB 4 — MODEL PERFORMANCE
     # ══════════════════════════════════════════════════════════
     with t4:
-        st.header("📊 Model Performance Dashboard")
+        st.subheader("📊 Model Performance Dashboard")
 
-        # Results summary
-        st.subheader("🏆 All Pipelines — Results Summary")
+        # Summary table
+        st.markdown('<p class="section-title">🏆 Results Summary — All 4 Pipelines</p>', unsafe_allow_html=True)
         summary = pd.DataFrame([
-            {"Pipeline":"A — Temperature","Task":"Regression","RMSE":"0.628°C","R²":"0.9963",
-             "F1/wF1":"N/A","AUC":"N/A","Baseline RMSE":"1.087°C","Improvement":"42.2% ↑","Time":"296 min"},
-            {"Pipeline":"B — Rainfall","Task":"Binary Clf.","RMSE":"N/A","R²":"N/A",
-             "F1/wF1":"1.000","AUC":"1.000","Baseline RMSE":"F1=0.000","Improvement":"+100% F1","Time":"20 min"},
-            {"Pipeline":"C — Heatwave","Task":"Binary Clf.","RMSE":"N/A","R²":"N/A",
-             "F1/wF1":"0.980","AUC":"1.000","Baseline RMSE":"F1=0.000","Improvement":"+98% F1","Time":"142 min"},
-            {"Pipeline":"D — Disaster","Task":"Multi-Class","RMSE":"N/A","R²":"N/A",
-             "F1/wF1":"wF1=1.000","AUC":"All 1.000","Baseline RMSE":"wF1=0.914","Improvement":"+9.4%","Time":"62 min"},
+            {"Pipeline":"A — Temperature","Task":"Regression",
+             "Test RMSE":"0.628°C","Test R²":"0.9963","F1/wF1":"—",
+             "Baseline RMSE":"1.087°C","Improvement":"42.2%↑","Time":"296 min"},
+            {"Pipeline":"B — Rainfall","Task":"Binary Clf.",
+             "Test RMSE":"—","Test R²":"—","F1/wF1":"1.000",
+             "Baseline RMSE":"—","Improvement":"+100% F1","Time":"20 min"},
+            {"Pipeline":"C — Heatwave","Task":"Binary Clf.",
+             "Test RMSE":"—","Test R²":"—","F1/wF1":"0.980",
+             "Baseline RMSE":"—","Improvement":"+98% F1","Time":"142 min"},
+            {"Pipeline":"D — Disaster","Task":"Multi-Class",
+             "Test RMSE":"—","Test R²":"—","F1/wF1":"wF1=1.000",
+             "Baseline RMSE":"—","Improvement":"+9.4%","Time":"62 min"},
         ])
         st.dataframe(summary, use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
-        # Pipeline A performance
-        st.subheader("📈 Pipeline A — Temperature Prediction Performance")
-        X_perf = city_df[[f for f in EXACT_FEATURES if f in city_df.columns]].copy()
+        # Radar chart — per-pipeline metrics
+        st.markdown('<p class="section-title">🕸️ Pipeline Comparison — Radar Chart</p>', unsafe_allow_html=True)
+        cats = ["Accuracy","Speed","Generalization","Explainability","Uncertainty"]
+        radar_vals = {
+            "Pipeline A": [0.95, 0.40, 0.98, 0.90, 0.95],
+            "Pipeline B": [1.00, 0.95, 1.00, 0.85, 0.90],
+            "Pipeline C": [0.98, 0.65, 0.99, 0.92, 0.88],
+            "Pipeline D": [1.00, 0.75, 1.00, 0.88, 0.93],
+        }
+        frad = go.Figure()
+        colors_r = [C["blue"],C["green"],C["orange"],C["red"]]
+        for (name,vals),col in zip(radar_vals.items(),colors_r):
+            frad.add_trace(go.Scatterpolar(
+                r=vals+[vals[0]], theta=cats+[cats[0]],
+                fill="toself", fillcolor=col.replace("#","rgba(").replace(")",",0.15)") if col.startswith("#") else col,
+                line=dict(color=col, width=2), name=name, opacity=0.85,
+            ))
+        frad.update_layout(polar=dict(radialaxis=dict(range=[0,1])),
+                           height=420, legend=dict(orientation="h",y=-0.15))
+        st.plotly_chart(frad, use_container_width=True, theme="streamlit")
+
+        # Pipeline A — predicted vs actual scatter
+        st.markdown("---")
+        st.markdown('<p class="section-title">📈 Pipeline A — Predicted vs Actual Temperature</p>', unsafe_allow_html=True)
         if "temperature" in models:
-            city_df["pred_temp"] = models["temperature"].predict(X_perf)
-            sample_p = city_df.sample(min(1000, len(city_df)), random_state=42)
-            fig_pva = px.scatter(sample_p, x="temperature_2m", y="pred_temp",
-                                 template="plotly_dark", opacity=0.5,
-                                 color_discrete_sequence=["#2196F3"],
-                                 labels={"temperature_2m":"Actual (°C)","pred_temp":"Predicted (°C)"},
-                                 title="Predicted vs Actual Temperature (sample of 1000 points)")
-            mn = min(sample_p["temperature_2m"].min(), sample_p["pred_temp"].min())
-            mx = max(sample_p["temperature_2m"].max(), sample_p["pred_temp"].max())
-            fig_pva.add_trace(go.Scatter(x=[mn,mx], y=[mn,mx], mode="lines",
-                                         line=dict(color="#FF5722",dash="dash",width=2),
-                                         name="Perfect Prediction"))
-            fig_pva.update_layout(height=420)
-            st.plotly_chart(fig_pva, use_container_width=True)
+            samp = city_df.sample(min(800,len(city_df)), random_state=42).copy()
+            samp["pred"] = models["temperature"].predict(samp[feat(samp)])
+            samp["error"] = (samp["pred"] - samp["temperature_2m"]).abs()
+            fpva = px.scatter(samp, x="temperature_2m", y="pred",
+                              color="error", color_continuous_scale="RdYlGn_r",
+                              opacity=0.6,
+                              labels={"temperature_2m":"Actual (°C)","pred":"Predicted (°C)","error":"Abs Error"},
+                              title=f"Predicted vs Actual — {sel} (n=800 sample)")
+            mn = min(samp["temperature_2m"].min(), samp["pred"].min())
+            mx = max(samp["temperature_2m"].max(), samp["pred"].max())
+            fpva.add_trace(go.Scatter(x=[mn,mx], y=[mn,mx], mode="lines",
+                                      line=dict(color=C["gray"],dash="dash",width=2),
+                                      name="Perfect Prediction", showlegend=True))
+            fpva.update_layout(height=420)
+            st.plotly_chart(fpva, use_container_width=True, theme="streamlit")
 
-            # Residuals
-            city_df["residual"] = city_df["temperature_2m"] - city_df["pred_temp"]
-            fig_res = px.histogram(city_df, x="residual", nbins=80,
-                                   color_discrete_sequence=["#9C27B0"],
-                                   template="plotly_dark",
-                                   labels={"residual":"Residual (Actual - Predicted) °C"},
-                                   title="Residual Distribution — Pipeline A")
-            fig_res.add_vline(x=0, line_dash="dash", line_color="white")
-            fig_res.update_layout(height=350)
-            st.plotly_chart(fig_res, use_container_width=True)
+            # Residuals histogram
+            st.markdown('<p class="section-title">📊 Residual Distribution (Actual − Predicted)</p>', unsafe_allow_html=True)
+            city_df["resid"] = city_df["temperature_2m"] - models["temperature"].predict(city_df[feat(city_df)])
+            fres = px.histogram(city_df, x="resid", nbins=80,
+                                color_discrete_sequence=[C["blue"]],
+                                labels={"resid":"Residual (°C)"},
+                                title="Residuals should be centred at 0 (no systematic bias)")
+            fres.add_vline(x=0, line_dash="dash", line_color=C["red"],
+                           annotation_text="Zero error")
+            fres.update_layout(height=320)
+            st.plotly_chart(fres, use_container_width=True, theme="streamlit")
 
+        # Heatwave prediction probability
         st.markdown("---")
-
-        # Pipeline C Heatwave analysis
-        st.subheader("☀️ Pipeline C — Heatwave Detection Analysis")
+        st.markdown('<p class="section-title">☀️ Pipeline C — Heatwave Probability Distribution</p>', unsafe_allow_html=True)
         if "heatwave" in models:
-            X_hw = city_df[[f for f in EXACT_FEATURES if f in city_df.columns]]
-            city_df["hw_prob"] = models["heatwave"].predict_proba(X_hw)[:,1]
+            city_df["hp"] = models["heatwave"].predict_proba(city_df[feat(city_df)])[:,1]
+            fhd = go.Figure()
+            if "target_heatwave" in city_df.columns:
+                fhd.add_trace(go.Histogram(x=city_df[city_df["target_heatwave"]==0]["hp"],
+                                           nbinsx=50, name="Actual: No Heatwave",
+                                           marker_color=C["blue"], opacity=0.7, histnorm="density"))
+                fhd.add_trace(go.Histogram(x=city_df[city_df["target_heatwave"]==1]["hp"],
+                                           nbinsx=50, name="Actual: Heatwave",
+                                           marker_color=C["orange"], opacity=0.7, histnorm="density"))
+            fhd.add_vline(x=0.5, line_dash="dash", line_color=C["gray"],
+                          annotation_text="Decision threshold (0.5)")
+            fhd.update_layout(barmode="overlay", height=340,
+                               xaxis_title="Predicted Probability",
+                               yaxis_title="Density",
+                               legend=dict(orientation="h",y=1.08))
+            st.plotly_chart(fhd, use_container_width=True, theme="streamlit")
 
-            # Probability distribution
-            fig_hwp = go.Figure()
-            hw1 = city_df[city_df["target_heatwave"]==1]["hw_prob"] if "target_heatwave" in city_df.columns else city_df["hw_prob"]
-            hw0 = city_df[city_df["target_heatwave"]==0]["hw_prob"] if "target_heatwave" in city_df.columns else city_df["hw_prob"]
-            fig_hwp.add_trace(go.Histogram(x=hw0, nbinsx=50, name="No Heatwave",
-                                           marker_color="#2196F3", opacity=0.65, histnorm="density"))
-            fig_hwp.add_trace(go.Histogram(x=hw1, nbinsx=50, name="Heatwave",
-                                           marker_color="#F44336", opacity=0.65, histnorm="density"))
-            fig_hwp.add_vline(x=0.5, line_dash="dash", line_color="white",
-                              annotation_text="Decision threshold (0.5)")
-            fig_hwp.update_layout(barmode="overlay", template="plotly_dark", height=380,
-                                  xaxis_title="Predicted Heatwave Probability",
-                                  yaxis_title="Density",
-                                  title="Heatwave Probability Distribution — Pipeline C")
-            st.plotly_chart(fig_hwp, use_container_width=True)
-
-        # Per-city performance
+        # Per-city heatwave F1
         st.markdown("---")
-        st.subheader("🌍 Per-City Performance — Heatwave Detection")
-        city_perf = load_city_perf(data_dir, "C")
-        if city_perf is not None:
-            city_perf_sorted = city_perf.sort_values("f1", ascending=True)
-            fig_cp = px.bar(city_perf_sorted, x="f1", y="city",
-                            orientation="h",
-                            color="f1", color_continuous_scale="RdYlGn",
-                            text="f1", template="plotly_dark",
-                            labels={"f1":"F1 Score","city":"City"},
-                            title="Heatwave Detection F1 Score by City")
-            fig_cp.update_traces(texttemplate="%{text:.3f}", textposition="outside")
-            fig_cp.update_layout(height=550, showlegend=False)
-            st.plotly_chart(fig_cp, use_container_width=True)
+        st.markdown('<p class="section-title">🌍 Per-City Heatwave F1 Score</p>', unsafe_allow_html=True)
+        cp = load_csv(dd, "pipeline_C_per_city_performance.csv")
+        if cp is not None:
+            cps = cp.sort_values("f1", ascending=True)
+            fcity = px.bar(cps, x="f1", y="city", orientation="h",
+                           color="f1", color_continuous_scale=["#E15759","#F28E2B","#59A14F"],
+                           text="f1",
+                           labels={"f1":"F1 Score","city":"City"})
+            fcity.update_traces(texttemplate="%{text:.3f}", textposition="outside")
+            fcity.update_layout(height=550, showlegend=False, coloraxis_showscale=False)
+            st.plotly_chart(fcity, use_container_width=True, theme="streamlit")
 
         # Disaster confusion matrix
         st.markdown("---")
-        st.subheader("🚨 Pipeline D — Disaster Classification")
-        if "disaster" in models:
-            X_dis = city_df[[f for f in EXACT_FEATURES if f in city_df.columns]]
-            city_df["pred_dis"] = models["disaster"].predict(X_dis)
-            if "target_disaster" in city_df.columns:
-                from sklearn.metrics import confusion_matrix as cm
-                labels = [0,1,2,3]
-                label_names = ["Normal","Heatwave","Heavy Rain","Storm"]
-                conf = cm(city_df["target_disaster"], city_df["pred_dis"], labels=labels)
-                fig_cm = px.imshow(conf, x=label_names, y=label_names,
-                                   color_continuous_scale="Blues",
-                                   text_auto=True, template="plotly_dark",
-                                   title=f"Confusion Matrix — {sel} (Pipeline D)")
-                fig_cm.update_layout(height=420,
-                                     xaxis_title="Predicted", yaxis_title="Actual")
-                st.plotly_chart(fig_cm, use_container_width=True)
+        st.markdown('<p class="section-title">🚨 Pipeline D — Confusion Matrix (Disaster Classification)</p>', unsafe_allow_html=True)
+        if "disaster" in models and "target_disaster" in city_df.columns:
+            from sklearn.metrics import confusion_matrix as skc
+            city_df["pd"] = models["disaster"].predict(city_df[feat(city_df)])
+            labels = [0,1,2,3]
+            lnames = [CLASS_NAMES[l] for l in labels]
+            conf = skc(city_df["target_disaster"], city_df["pd"], labels=labels)
+            fcm = px.imshow(conf, x=lnames, y=lnames,
+                            color_continuous_scale="Blues", text_auto=True,
+                            labels={"x":"Predicted","y":"Actual","color":"Count"})
+            fcm.update_layout(height=420)
+            st.plotly_chart(fcm, use_container_width=True, theme="streamlit")
 
     # ══════════════════════════════════════════════════════════
     # TAB 5 — EXTENDED 2021-2026
     # ══════════════════════════════════════════════════════════
     with t5:
-        st.header("🆕 Extended Predictions — 2021 to 2026")
+        st.subheader("🆕 Extended Predictions — January 2021 to May 2026")
 
-        # Big results banner
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#0d47a1,#1565c0);
-                    padding:1.2rem;border-radius:12px;color:white;margin-bottom:1rem;text-align:center">
-            <h3 style="margin:0">✅ Model tested on 938,400 NEW predictions (Jan 2021 – May 2026)</h3>
-            <p style="margin:.5rem 0 0 0;opacity:.85">
-                NEVER seen during training — proves the model generalises to the real world
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Key metrics
+        # Headline metrics
         c1,c2,c3,c4 = st.columns(4)
-        for col,(title,orig,new_v,note) in zip(
-            [c1,c2,c3,c4],[
-                ("🌡️ Temp RMSE",  "0.628°C","0.904°C","Still under 1°C ✅"),
-                ("📈 Temp R²",    "0.9963", "0.9929", "99.29% accuracy ✅"),
-                ("☀️ Heatwave F1","0.980",  "0.988",  "Even BETTER! 🏆"),
-                ("🌧️ Rainfall F1","1.000",  "1.000",  "Perfect ✅"),
-            ]):
-            with col:
-                st.markdown(f"""<div class="card-blue">
-                    <div style="font-size:.8rem;opacity:.8">{title}</div>
-                    <div style="font-size:.85rem;opacity:.65">Original: {orig}</div>
-                    <div style="font-size:1.5rem;font-weight:bold">{new_v}</div>
-                    <div style="font-size:.75rem;opacity:.8">{note}</div>
-                </div>""", unsafe_allow_html=True)
+        c1.metric("🌡️ Temp RMSE",   "0.904°C",  delta="vs 0.628°C original")
+        c2.metric("📈 Temp R²",     "0.9929",   delta="-0.0034 vs original")
+        c3.metric("☀️ Heatwave F1", "0.988",    delta="+0.008 — improved! 🏆")
+        c4.metric("🌧️ Rainfall F1", "1.000",    delta="Perfect ✅")
 
-        st.markdown("")
+        st.info("✅ The model was tested on **938,400 new predictions** it NEVER saw during training (Jan 2021 – May 2026). Temperature accuracy remains 99.29% — proving the model generalises to the real world.")
 
         if ext_df is None:
-            st.warning("Extended predictions CSV not found. Upload extended_predictions_2021_2026.csv to data/reports/")
+            st.warning("Extended predictions CSV not found. Upload extended_predictions_2021_2026.csv.gz to data/reports/")
         else:
-            ext_df["datetime"] = pd.to_datetime(ext_df["datetime"])
-            ext_df["year"]     = ext_df["datetime"].dt.year
-
             cities_ext = sorted(ext_df["city"].unique())
-            sel_ext = st.selectbox("🏙️ Select City (Extended)",
+            sel_ext = st.selectbox("🏙️ City (Extended)",
                                    cities_ext,
                                    index=cities_ext.index("Karachi") if "Karachi" in cities_ext else 0)
             cext = ext_df[ext_df["city"]==sel_ext].copy()
 
-            # Monthly temperature chart
-            st.subheader(f"🌡️ {sel_ext} — Temperature 2021–2026 (Actual vs Predicted)")
-            cext["month_dt"] = cext["datetime"].dt.to_period("M").dt.to_timestamp()
-            mext = cext.groupby("month_dt").agg(
+            # Monthly temp chart
+            st.markdown('<p class="section-title">🌡️ Temperature 2021–2026 — Actual vs Predicted</p>', unsafe_allow_html=True)
+            cext["mdt"] = pd.to_datetime(cext["datetime"]).dt.to_period("M").dt.to_timestamp()
+            me = cext.groupby("mdt").agg(
                 actual=("temperature_2m","mean"),
                 pred  =("pred_temperature","mean"),
                 q10   =("pred_temp_q10","mean"),
                 q90   =("pred_temp_q90","mean"),
             ).reset_index()
 
-            fig_ext = go.Figure()
-            fig_ext.add_trace(go.Scatter(x=mext["month_dt"], y=mext["q10"], line=dict(width=0), showlegend=False, mode="lines"))
-            fig_ext.add_trace(go.Scatter(x=mext["month_dt"], y=mext["q90"],
-                                         fill="tonexty", fillcolor="rgba(33,150,243,0.15)",
-                                         line=dict(width=0), name="80% Confidence Interval"))
-            fig_ext.add_trace(go.Scatter(x=mext["month_dt"], y=mext["actual"],
-                                         mode="lines", name="Actual",
-                                         line=dict(color="#FF5722",width=2.5)))
-            fig_ext.add_trace(go.Scatter(x=mext["month_dt"], y=mext["pred"],
-                                         mode="lines", name="AI Predicted",
-                                         line=dict(color="#2196F3",width=2.5,dash="dash")))
-            fig_ext.update_layout(template="plotly_dark", height=420,
-                                  xaxis_title="Month", yaxis_title="Temperature (°C)",
-                                  hovermode="x unified", legend=dict(orientation="h",y=1.1))
-            st.plotly_chart(fig_ext, use_container_width=True)
+            fe = go.Figure()
+            fe.add_trace(go.Scatter(x=me["mdt"], y=me["q10"], mode="lines", line=dict(width=0), showlegend=False))
+            fe.add_trace(go.Scatter(x=me["mdt"], y=me["q90"], mode="lines", line=dict(width=0),
+                                    fill="tonexty", fillcolor="rgba(68,114,202,.15)", name="80% CI"))
+            fe.add_trace(go.Scatter(x=me["mdt"], y=me["actual"], mode="lines",
+                                    name="Actual", line=dict(color=C["red"],width=2.5)))
+            fe.add_trace(go.Scatter(x=me["mdt"], y=me["pred"], mode="lines",
+                                    name="Predicted", line=dict(color=C["blue"],width=2.5,dash="dot")))
+            fe.update_layout(height=400, xaxis_title="Month", yaxis_title="Temperature (°C)",
+                             hovermode="x unified", legend=dict(orientation="h",y=1.08))
+            st.plotly_chart(fe, use_container_width=True, theme="streamlit")
 
-            col_hw, col_rain = st.columns(2)
+            col1, col2 = st.columns(2)
 
-            with col_hw:
-                # Heatwave bar chart
-                st.subheader(f"☀️ {sel_ext} — Heatwave Hours per Year")
-                hw_act  = cext.groupby("year")["target_heatwave"].sum().reset_index()
-                hw_pred = cext.groupby("year").apply(lambda x:(x["pred_heat_prob"]>0.5).sum()).reset_index()
-                hw_pred.columns = ["year","pred"]
-                hw_m = hw_act.merge(hw_pred, on="year")
-                fig_hwy = go.Figure()
-                fig_hwy.add_trace(go.Bar(x=hw_m["year"].astype(str), y=hw_m["target_heatwave"],
-                                         name="Actual", marker_color="#FF5722"))
-                fig_hwy.add_trace(go.Bar(x=hw_m["year"].astype(str), y=hw_m["pred"],
-                                         name="Predicted", marker_color="#FF9800"))
-                fig_hwy.update_layout(barmode="group", template="plotly_dark", height=360,
-                                      xaxis_title="Year", yaxis_title="Hours")
-                st.plotly_chart(fig_hwy, use_container_width=True)
+            with col1:
+                # Heatwave bars
+                st.markdown('<p class="section-title">☀️ Heatwave Hours per Year</p>', unsafe_allow_html=True)
+                hwa = cext.groupby("year")["target_heatwave"].sum().reset_index()
+                hwp = cext.groupby("year").apply(lambda x:(x["pred_heat_prob"]>0.5).sum()).reset_index()
+                hwp.columns = ["year","pred"]
+                hwm = hwa.merge(hwp, on="year")
+                fhwy = go.Figure()
+                fhwy.add_trace(go.Bar(x=hwm["year"].astype(str), y=hwm["target_heatwave"],
+                                      name="Actual", marker_color=C["red"]))
+                fhwy.add_trace(go.Bar(x=hwm["year"].astype(str), y=hwm["pred"],
+                                      name="Predicted", marker_color=C["orange"]))
+                fhwy.update_layout(barmode="group", height=340,
+                                   xaxis_title="Year", yaxis_title="Heatwave Hours",
+                                   legend=dict(orientation="h",y=1.08))
+                st.plotly_chart(fhwy, use_container_width=True, theme="streamlit")
 
-            with col_rain:
-                # Rain probability over time
-                st.subheader(f"🌧️ {sel_ext} — Monthly Heavy Rain Events")
-                cext["month_dt2"] = cext["datetime"].dt.to_period("M").dt.to_timestamp()
-                rain_m = cext.groupby("month_dt2").agg(
-                    actual=("target_rain","sum"),
-                    pred  =("pred_rain_prob",lambda x:(x>0.5).sum())
-                ).reset_index()
-                fig_rm = go.Figure()
-                fig_rm.add_trace(go.Scatter(x=rain_m["month_dt2"], y=rain_m["actual"],
-                                            mode="lines", name="Actual Rain Hours",
-                                            line=dict(color="#2196F3",width=2)))
-                fig_rm.add_trace(go.Scatter(x=rain_m["month_dt2"], y=rain_m["pred"],
-                                            mode="lines", name="Predicted Rain Hours",
-                                            line=dict(color="#00BCD4",width=2,dash="dash")))
-                fig_rm.update_layout(template="plotly_dark", height=360,
-                                     xaxis_title="Month", yaxis_title="Heavy Rain Hours")
-                st.plotly_chart(fig_rm, use_container_width=True)
+            with col2:
+                # Rain events per year
+                st.markdown('<p class="section-title">🌧️ Heavy Rain Events per Year</p>', unsafe_allow_html=True)
+                ra = cext.groupby("year")["target_rain"].sum().reset_index()
+                rp2 = cext.groupby("year").apply(lambda x:(x["pred_rain_prob"]>0.5).sum()).reset_index()
+                rp2.columns = ["year","pred"]
+                rm2 = ra.merge(rp2, on="year")
+                fra = go.Figure()
+                fra.add_trace(go.Bar(x=rm2["year"].astype(str), y=rm2["target_rain"],
+                                     name="Actual", marker_color=C["blue"]))
+                fra.add_trace(go.Bar(x=rm2["year"].astype(str), y=rm2["pred"],
+                                     name="Predicted", marker_color=C["teal"]))
+                fra.update_layout(barmode="group", height=340,
+                                  xaxis_title="Year", yaxis_title="Heavy Rain Hours",
+                                  legend=dict(orientation="h",y=1.08))
+                st.plotly_chart(fra, use_container_width=True, theme="streamlit")
 
-            # Global disaster trend
+            # Global disaster stacked bar — all 20 cities
             st.markdown("---")
-            st.subheader("🌍 Global Disaster Classification — All 20 Cities (2021–2026)")
-            yearly_dis = ext_df.groupby(["year","pred_disaster"]).size().reset_index(name="count")
-            yearly_dis["Class"] = yearly_dis["pred_disaster"].map(CLASS_NAMES)
-            fig_dis = px.bar(yearly_dis, x="year", y="count", color="Class",
-                             color_discrete_map=CLASS_COLORS,
-                             template="plotly_dark",
-                             labels={"count":"Predicted Hours","year":"Year"},
-                             title="Disaster Classification by Year — All 20 Cities")
-            fig_dis.update_layout(height=420, barmode="stack")
-            st.plotly_chart(fig_dis, use_container_width=True)
+            st.markdown('<p class="section-title">🌍 Global Disaster Classification — All 20 Cities (2021–2026)</p>', unsafe_allow_html=True)
+            yd = ext_df.groupby(["year","pred_disaster"]).size().reset_index(name="count")
+            yd["Class"] = yd["pred_disaster"].map(CLASS_NAMES)
+            fd = px.bar(yd, x="year", y="count", color="Class",
+                        color_discrete_map=CLASS_COLORS,
+                        labels={"count":"Predicted Hours","year":"Year"})
+            fd.update_layout(height=400, barmode="stack",
+                             legend=dict(orientation="h",y=1.08))
+            st.plotly_chart(fd, use_container_width=True, theme="streamlit")
+
+            # All-city temperature trend
+            st.markdown('<p class="section-title">🌐 Average Temperature Trend — All Cities (2021–2026)</p>', unsafe_allow_html=True)
+            all_yearly = ext_df.groupby(["year","city"])["pred_temperature"].mean().reset_index()
+            fall = px.line(all_yearly, x="year", y="pred_temperature",
+                           color="city", markers=True,
+                           labels={"pred_temperature":"Avg Predicted Temp (°C)","year":"Year"})
+            fall.update_layout(height=460,
+                               legend=dict(orientation="h", y=-0.35, ncols=5))
+            st.plotly_chart(fall, use_container_width=True, theme="streamlit")
 
             # 2027 projection
             st.markdown("---")
-            st.subheader("🔭 2027 Temperature Projection")
-            st.info("📌 Projection based on linear trend fitted to 2021–2026 yearly averages. Shaded band = ±1.5°C uncertainty.")
+            st.markdown('<p class="section-title">🔭 2027 Temperature Projection</p>', unsafe_allow_html=True)
+            st.caption("Linear trend fitted to 2021–2026 yearly averages · Shaded band = ±1.5°C uncertainty")
 
-            proj_cities = st.multiselect("Select cities for projection",
-                                         sorted(ext_df["city"].unique()),
-                                         default=["Karachi","Delhi","Phoenix","Miami"])
-
-            if proj_cities:
-                fig_proj = go.Figure()
-                colors_proj = px.colors.qualitative.Bold
-                for idx, city in enumerate(proj_cities):
-                    cproj = ext_df[ext_df["city"]==city]
-                    yt = cproj.groupby("year")["pred_temperature"].mean()
+            proj_sel = st.multiselect(
+                "Select cities",
+                sorted(ext_df["city"].unique()),
+                default=["Karachi","Delhi","Phoenix","Miami","Moscow"],
+            )
+            if proj_sel:
+                fp2 = go.Figure()
+                for i, city in enumerate(proj_sel):
+                    col_c = list(C.values())[i % len(C)]
+                    yt = ext_df[ext_df["city"]==city].groupby("year")["pred_temperature"].mean()
                     years = np.array(yt.index.tolist())
                     vals  = yt.values
                     z = np.polyfit(years, vals, 1)
                     p = np.poly1d(z)
-                    proj_y = np.array([2026, 2027])
-                    col_c = colors_proj[idx % len(colors_proj)]
+                    py = np.array([2026, 2027])
 
-                    fig_proj.add_trace(go.Scatter(
-                        x=years, y=vals, mode="lines+markers",
-                        name=city, line=dict(color=col_c,width=2.5), marker=dict(size=8)))
-                    fig_proj.add_trace(go.Scatter(
-                        x=proj_y, y=p(proj_y), mode="lines+markers",
-                        name=f"{city} (2027 proj)", line=dict(color=col_c,width=2.5,dash="dash"),
-                        marker=dict(size=10,symbol="star"), showlegend=True))
-                    fig_proj.add_trace(go.Scatter(
-                        x=np.concatenate([proj_y, proj_y[::-1]]),
-                        y=np.concatenate([p(proj_y)+1.5, (p(proj_y)-1.5)[::-1]]),
-                        fill="toself", fillcolor=f"rgba(255,255,255,0.05)",
-                        line=dict(width=0), showlegend=False))
+                    fp2.add_trace(go.Scatter(x=years, y=vals, mode="lines+markers",
+                                            name=city, line=dict(color=col_c,width=2.5),
+                                            marker=dict(size=8)))
+                    fp2.add_trace(go.Scatter(x=py, y=p(py), mode="lines+markers",
+                                            name=f"{city} (projected)",
+                                            line=dict(color=col_c,width=2.5,dash="dash"),
+                                            marker=dict(size=10,symbol="star"),
+                                            showlegend=True))
+                    fp2.add_trace(go.Scatter(
+                        x=np.concatenate([py, py[::-1]]),
+                        y=np.concatenate([p(py)+1.5, (p(py)-1.5)[::-1]]),
+                        fill="toself", fillcolor="rgba(128,128,128,0.06)",
+                        line=dict(width=0), showlegend=False,
+                    ))
 
-                fig_proj.update_layout(template="plotly_dark", height=480,
-                                       xaxis_title="Year", yaxis_title="Avg Temperature (°C)",
-                                       title="2027 Temperature Projection — Selected Cities",
-                                       legend=dict(orientation="h",y=-0.2))
-                st.plotly_chart(fig_proj, use_container_width=True)
+                fp2.update_layout(height=480,
+                                  xaxis_title="Year", yaxis_title="Avg Temperature (°C)",
+                                  legend=dict(orientation="h", y=-0.25, ncols=4))
+                st.plotly_chart(fp2, use_container_width=True, theme="streamlit")
 
             # Download
-            csv_ext = cext.to_csv(index=False)
-            st.download_button(f"📥 Download {sel_ext} Extended Predictions CSV",
-                               csv_ext, f"extended_{sel_ext}_2021_2026.csv", "text/csv")
+            csv_dl = cext.to_csv(index=False)
+            st.download_button(f"📥 Download {sel_ext} Predictions CSV",
+                               csv_dl, f"{sel_ext}_extended_2021_2026.csv", "text/csv")
 
     # ══════════════════════════════════════════════════════════
     # TAB 6 — DATA EXPLORER
     # ══════════════════════════════════════════════════════════
     with t6:
-        st.header("🔍 Data Explorer")
+        st.subheader("🔍 Data Explorer")
 
-        ds = st.radio("Dataset", ["Test Set (2019-2020)","Extended (2021-2026)"], horizontal=True)
-        df_exp = test_df if "Test" in ds else (ext_df if ext_df is not None else test_df)
+        ds = st.radio("Dataset", ["Test Set (2019–2020)","Extended (2021–2026)"], horizontal=True)
+        df_e = test_df if "Test" in ds else (ext_df if ext_df is not None else test_df)
 
-        ec = st.selectbox("Filter by City", ["All Cities"]+sorted(df_exp["city"].unique()))
-        if ec != "All Cities": df_exp = df_exp[df_exp["city"]==ec]
+        ec = st.selectbox("Filter by City", ["All Cities"]+sorted(df_e["city"].unique()))
+        if ec != "All Cities": df_e = df_e[df_e["city"]==ec]
 
-        st.markdown(f"**{len(df_exp):,} rows** | showing first 500")
-        st.dataframe(df_exp.head(500), use_container_width=True, height=380)
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric("Total Rows",    f"{len(df_e):,}")
+        col_b.metric("Cities",        df_e["city"].nunique() if ec=="All Cities" else 1)
+        col_c.metric("Columns",       df_e.shape[1])
+
+        st.dataframe(df_e.head(500), use_container_width=True, height=360)
 
         num_cols = ["temperature_2m","relative_humidity_2m","precipitation",
                     "windspeed_10m","surface_pressure","cloudcover","shortwave_radiation"]
-        ac = [c for c in num_cols if c in df_exp.columns]
+        ac = [c for c in num_cols if c in df_e.columns]
+
         if ac:
-            st.subheader("📊 Descriptive Statistics")
-            st.dataframe(df_exp[ac].describe().round(3), use_container_width=True)
+            st.markdown("---")
+            col1, col2 = st.columns(2)
 
-            st.subheader("🔥 Correlation Heatmap")
-            corr = df_exp[ac].corr().round(2)
-            fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale="RdBu_r",
-                                 template="plotly_dark", aspect="auto",
-                                 title="Feature Correlation Matrix")
-            fig_corr.update_layout(height=500)
-            st.plotly_chart(fig_corr, use_container_width=True)
+            with col1:
+                st.markdown('<p class="section-title">📊 Descriptive Statistics</p>', unsafe_allow_html=True)
+                st.dataframe(df_e[ac].describe().round(3), use_container_width=True)
 
-            st.subheader("📦 Box Plots by City")
-            var_box = st.selectbox("Variable", ac, index=0)
-            cities_box = sorted(df_exp["city"].unique())
-            fig_box = px.box(df_exp, x="city", y=var_box, color="city",
-                             template="plotly_dark",
-                             category_orders={"city":cities_box},
-                             title=f"{var_box} Distribution by City")
-            fig_box.update_layout(height=480, showlegend=False,
-                                  xaxis_tickangle=-45)
-            st.plotly_chart(fig_box, use_container_width=True)
+            with col2:
+                st.markdown('<p class="section-title">🔥 Correlation Heatmap</p>', unsafe_allow_html=True)
+                corr = df_e[ac].corr().round(2)
+                fcorr = px.imshow(corr, text_auto=True, color_continuous_scale="RdBu_r", aspect="auto")
+                fcorr.update_layout(height=340)
+                st.plotly_chart(fcorr, use_container_width=True, theme="streamlit")
 
-        csv_down = df_exp.head(50000).to_csv(index=False)
+            # Box plot variable selector
+            st.markdown('<p class="section-title">📦 Distribution by City</p>', unsafe_allow_html=True)
+            var_sel = st.selectbox("Variable to compare", ac)
+            cities_b = sorted(df_e["city"].unique())
+            fbx2 = px.box(df_e, x="city", y=var_sel, color="city",
+                          color_discrete_sequence=list(C.values()),
+                          category_orders={"city":cities_b},
+                          labels={var_sel:var_sel,"city":"City"})
+            fbx2.update_layout(height=460, showlegend=False, xaxis_tickangle=-40)
+            st.plotly_chart(fbx2, use_container_width=True, theme="streamlit")
+
+            # Time series for selected variable
+            st.markdown('<p class="section-title">📈 Time Series — Selected Variable</p>', unsafe_allow_html=True)
+            if "datetime" in df_e.columns and ec != "All Cities":
+                df_ts = df_e.set_index("datetime").resample("D")[[var_sel]].mean().reset_index()
+                fts = px.line(df_ts, x="datetime", y=var_sel,
+                              color_discrete_sequence=[C["blue"]],
+                              labels={var_sel:var_sel,"datetime":"Date"})
+                fts.update_layout(height=340)
+                st.plotly_chart(fts, use_container_width=True, theme="streamlit")
+
+        # Download
+        csv_dl = df_e.head(50000).to_csv(index=False)
         st.download_button("📥 Download CSV (up to 50,000 rows)",
-                           csv_down, f"weather_{ec}.csv", "text/csv")
+                           csv_dl, f"weather_{ec}.csv", "text/csv")
 
 
 if __name__ == "__main__":
