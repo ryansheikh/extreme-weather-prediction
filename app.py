@@ -336,7 +336,7 @@ def main():
         prob_fig.update_layout(template="plotly_dark", height=280,
                                xaxis=dict(title="Probability",range=[0,1]),
                                showlegend=False, barmode="overlay")
-        st.plotly_chart(fig=prob_fig, use_container_width=True)
+        st.plotly_chart(prob_fig, use_container_width=True)
 
         # Rain probability gauge
         col_r, col_h = st.columns(2)
