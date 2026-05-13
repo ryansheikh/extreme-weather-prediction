@@ -789,7 +789,7 @@ def main():
                            color="city", markers=True,
                            labels={"pred_temperature":"Avg Predicted Temp (°C)","year":"Year"})
             fall.update_layout(height=460,
-                               legend=dict(orientation="h", y=-0.35, ncols=5))
+                               legend=dict(orientation="h", y=-0.35))
             st.plotly_chart(fall, use_container_width=True, theme="streamlit")
 
             # 2027 projection
@@ -830,7 +830,7 @@ def main():
 
                 fp2.update_layout(height=480,
                                   xaxis_title="Year", yaxis_title="Avg Temperature (°C)",
-                                  legend=dict(orientation="h", y=-0.25, ncols=4))
+                                  legend=dict(orientation="h", y=-0.25))
                 st.plotly_chart(fp2, use_container_width=True, theme="streamlit")
 
             # Download
