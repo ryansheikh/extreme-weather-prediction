@@ -159,11 +159,24 @@ def load_test(dd):
             return fix_columns(df)
     return None
 
-@st.cache_data
 def load_ext(dd):
-    for n in ["extended_predictions_2021_2026.csv.gz",
-              "extended_predictions_2021_2026.csv"]:
-        p = dd/"reports"/n
+    # All possible locations to check
+    search_paths = []
+    if dd:
+        search_paths += [
+            dd/"reports"/"extended_predictions_2021_2026.csv.gz",
+            dd/"reports"/"extended_predictions_2021_2026.csv",
+        ]
+    # Streamlit Cloud absolute paths
+    sc_base = Path("/mount/src/extreme-weather-prediction")
+    search_paths += [
+        sc_base/"data"/"reports"/"extended_predictions_2021_2026.csv.gz",
+        sc_base/"data"/"reports"/"extended_predictions_2021_2026.csv",
+        Path("data")/"reports"/"extended_predictions_2021_2026.csv.gz",
+        Path("data")/"reports"/"extended_predictions_2021_2026.csv",
+        Path(".")/"data"/"reports"/"extended_predictions_2021_2026.csv.gz",
+    ]
+    for p in search_paths:
         if p.exists():
             df = pd.read_csv(p, low_memory=False)
             df["datetime"] = pd.to_datetime(df["datetime"])
@@ -683,7 +696,15 @@ def main():
         st.info("✅ The model was tested on **938,400 new predictions** it NEVER saw during training (Jan 2021 – May 2026). Temperature accuracy remains 99.29% — proving the model generalises to the real world.")
 
         if ext_df is None:
-            st.warning("Extended predictions CSV not found. Upload extended_predictions_2021_2026.csv.gz to data/reports/")
+            st.warning("⚠️ Extended predictions CSV not found.")
+            sc_path = Path("/mount/src/extreme-weather-prediction/data/reports")
+            st.info(f"Looking in: {sc_path}")
+            if sc_path.exists():
+                files = list(sc_path.glob("*extended*"))
+                st.write("Files found:", [f.name for f in files] if files else "None matching 'extended'")
+                st.write("All files in reports/:", [f.name for f in sc_path.iterdir()])
+            else:
+                st.write(f"Folder does not exist: {sc_path}")
         else:
             cities_ext = sorted(ext_df["city"].unique())
             sel_ext = st.selectbox("🏙️ City (Extended)",
