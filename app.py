@@ -569,12 +569,17 @@ def main():
             "Pipeline D": [1.00, 0.75, 1.00, 0.88, 0.93],
         }
         frad = go.Figure()
-        colors_r = [C["blue"],C["green"],C["orange"],C["red"]]
-        for (name,vals),col in zip(radar_vals.items(),colors_r):
+        radar_colors = [
+            ("#4472CA","rgba(68,114,202,0.15)"),
+            ("#59A14F","rgba(89,161,79,0.15)"),
+            ("#F28E2B","rgba(242,142,43,0.15)"),
+            ("#E15759","rgba(225,87,89,0.15)"),
+        ]
+        for (name,vals),(line_col,fill_col) in zip(radar_vals.items(),radar_colors):
             frad.add_trace(go.Scatterpolar(
                 r=vals+[vals[0]], theta=cats+[cats[0]],
-                fill="toself", fillcolor=col.replace("#","rgba(").replace(")",",0.15)") if col.startswith("#") else col,
-                line=dict(color=col, width=2), name=name, opacity=0.85,
+                fill="toself", fillcolor=fill_col,
+                line=dict(color=line_col, width=2), name=name, opacity=0.85,
             ))
         frad.update_layout(polar=dict(radialaxis=dict(range=[0,1])),
                            height=420, legend=dict(orientation="h",y=-0.15))
