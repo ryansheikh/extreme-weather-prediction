@@ -1,0 +1,56 @@
+[
+  {
+    "Model": "Logistic Regression",
+    "Type": "Linear",
+    "F1": 0.8926150552978951,
+    "Precision": 0.8090105626212546,
+    "Recall": 0.9954907161803713,
+    "AUC": 0.9996207177188332,
+    "Train_Time_s": 33.8
+  },
+  {
+    "Model": "Random Forest",
+    "Type": "Bagging",
+    "F1": 0.9965397923875432,
+    "Precision": 1.0,
+    "Recall": 0.993103448275862,
+    "AUC": 0.9999999567734512,
+    "Train_Time_s": 161.1
+  },
+  {
+    "Model": "XGBoost",
+    "Type": "Boosting",
+    "F1": 0.9890710382513661,
+    "Precision": 0.9859427165700229,
+    "Recall": 0.9922192749778956,
+    "AUC": 0.9999867202666912,
+    "Train_Time_s": 58.4
+  },
+  {
+    "Model": "LightGBM",
+    "Type": "Boosting",
+    "F1": 0.9929928165351901,
+    "Precision": 0.9898954397680344,
+    "Recall": 0.9961096374889479,
+    "AUC": 0.9999940508622386,
+    "Train_Time_s": 40.7
+  },
+  {
+    "Model": "CatBoost",
+    "Type": "Boosting",
+    "F1": 0.9815578216532871,
+    "Precision": 0.9637835534725181,
+    "Recall": 1.0,
+    "AUC": 0.9999890793611887,
+    "Train_Time_s": 118.4
+  },
+  {
+    "Model": "1D-CNN (Deep Learning)",
+    "Type": "Neural Network",
+    "F1": 0.7988134336264435,
+    "Precision": 0.6650202857646851,
+    "Recall": 1.0,
+    "AUC": 0.9998177340253434,
+    "Train_Time_s": 3734.1
+  }
+]

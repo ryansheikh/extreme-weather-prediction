@@ -1,0 +1,50 @@
+[
+  {
+    "Model": "Baseline (Persistence)",
+    "Type": "Naive",
+    "RMSE": 1.0829396213176936,
+    "MAE": 0.7930661438370047,
+    "R2": 0.9901544320951804,
+    "Train_Time_s": 0.0
+  },
+  {
+    "Model": "Ridge Regression",
+    "Type": "Linear",
+    "RMSE": 0.9049940756106387,
+    "MAE": 0.6575096319777717,
+    "R2": 0.9931241917412206,
+    "Train_Time_s": 0.7
+  },
+  {
+    "Model": "Random Forest",
+    "Type": "Bagging Ensemble",
+    "RMSE": 0.6244695435267588,
+    "MAE": 0.41657051970887005,
+    "R2": 0.9967261799150077,
+    "Train_Time_s": 6522.1
+  },
+  {
+    "Model": "XGBoost",
+    "Type": "Gradient Boosting",
+    "RMSE": 0.6415112953962392,
+    "MAE": 0.41822771535367403,
+    "R2": 0.996545056893257,
+    "Train_Time_s": 177.7
+  },
+  {
+    "Model": "LightGBM",
+    "Type": "Gradient Boosting",
+    "RMSE": 0.6496489956607787,
+    "MAE": 0.42438975610973967,
+    "R2": 0.9964568476420401,
+    "Train_Time_s": 82.4
+  },
+  {
+    "Model": "CatBoost",
+    "Type": "Gradient Boosting",
+    "RMSE": 0.6533059204224709,
+    "MAE": 0.4256551661654686,
+    "R2": 0.9964168460110767,
+    "Train_Time_s": 180.3
+  }
+]

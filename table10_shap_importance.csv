@@ -1,0 +1,16 @@
+,Feature,Mean_Abs_SHAP
+1,temperature_2m,1.0791
+2,longitude,0.6047
+3,heat_index,0.5977
+4,dryness_index,0.1927
+5,windspeed_10m_lag_24h,0.1766
+6,relative_humidity_2m,0.1586
+7,windspeed_10m_lag_72h,0.1426
+8,temperature_2m_roll_24h_mean,0.1139
+9,year,0.1133
+10,windspeed_10m_roll_7d_mean,0.094
+11,windspeed_10m,0.0898
+12,cloudcover,0.0789
+13,day,0.0771
+14,pressure_tendency,0.077
+15,day_of_year,0.0746

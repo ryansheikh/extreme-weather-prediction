@@ -1,0 +1,6 @@
+Stage,Change,n_estimators,max_depth,learning_rate,num_leaves,F1,AUC
+1,Baseline,400,7,0.05,31,0.993,1.0
+2,n_estimators→800,800,7,0.05,31,0.9934,1.0
+3,"depth→10, leaves→63",800,10,0.05,63,0.994,1.0
+4,lr→0.03 + L1/L2 reg,1200,10,0.03,63,0.994,1.0
+5,threshold→0.65,1200,10,0.03,63,0.9942,1.0
